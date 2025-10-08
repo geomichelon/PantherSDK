@@ -1,0 +1,29 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.example.panther'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.example.panther'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+        externalNativeBuild { cmake { cppFlags '' } }
+        ndk { abiFilters 'x86_64' }
+    }
+
+    buildTypes {
+        release { minifyEnabled false }
+        debug { }
+    }
+
+    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt' } }
+
+    sourceSets { main { jniLibs.srcDirs = ['src/main/jniLibs'] } }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+}

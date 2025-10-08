@@ -1,0 +1,12 @@
+[package]
+name = "panther-observability"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tracing.workspace = true
+tracing-subscriber.workspace = true
+panther-domain = { path = "../panther-domain" }
+
+[dev-dependencies]
+serde_json.workspace = true

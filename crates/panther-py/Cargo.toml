@@ -1,0 +1,39 @@
+[package]
+name = "panther-py"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "pantherpy"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+once_cell.workspace = true
+serde_json.workspace = true
+panther-core = { path = "../panther-core" }
+panther-providers = { path = "../panther-providers" }
+panther-observability = { path = "../panther-observability" }
+panther-domain = { path = "../panther-domain" }
+panthersdk = { path = "../../panthersdk" }
+
+[features]
+default = []
+metrics-inmemory = ["dep:panther-metrics"]
+storage-inmemory = ["dep:panther-storage"]
+storage-sled = ["dep:panther-storage-sled"]
+
+[dependencies.panther-metrics]
+path = "../panther-metrics"
+optional = true
+
+[dependencies.panther-storage]
+path = "../panther-storage"
+optional = true
+
+[dependencies.panther-storage-sled]
+path = "../panther-storage-sled"
+optional = true
+
+[package.metadata.maturin]
+name = "pantherpy"

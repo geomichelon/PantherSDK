@@ -1,0 +1,31 @@
+[package]
+name = "panthersdk"
+version.workspace = true
+edition.workspace = true
+description = "Aggregator crate exposing PantherSDK domain, infrastructure, API, and FFI bindings"
+
+[lib]
+name = "panthersdk"
+path = "src/lib.rs"
+
+[[bin]]
+name = "panthersdk"
+path = "src/main.rs"
+
+[features]
+default = []
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+panther-domain = { path = "../crates/panther-domain" }
+panther-core = { path = "../crates/panther-core" }
+panther-providers = { path = "../crates/panther-providers" }
+panther-observability = { path = "../crates/panther-observability" }
+panther-metrics = { path = "../crates/panther-metrics" }
+panther-storage = { path = "../crates/panther-storage" }
+panther-storage-sled = { path = "../crates/panther-storage-sled" }

@@ -1,0 +1,18 @@
+[package]
+name = "panther-wasm"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+panther-core = { path = "../panther-core" }
+panther-providers = { path = "../panther-providers" }
+panther-observability = { path = "../panther-observability" }
+panther-domain = { path = "../panther-domain" }
+serde_json.workspace = true
+once_cell.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"

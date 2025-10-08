@@ -1,0 +1,232 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B1A1A001C0FF000100000001 /* Sources/ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1A011C0FF000100000001 /* Sources/ContentView.swift */; };
+		B1A1A002C0FF000100000001 /* Sources/PantherSDKBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1A012C0FF000100000001 /* Sources/PantherSDKBridge.swift */; };
+		B1A1A003C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1A013C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift */; };
+		B1A1A004C0FF000100000001 /* libs/libpanther_ffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B1A1A021C0FF000100000001 /* libs/libpanther_ffi.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		90543A8F2E96F022001379E2 /* PantherSampleSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PantherSampleSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1A1A010C0FF000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = SOURCE_ROOT; };
+		B1A1A011C0FF000100000001 /* Sources/ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/ContentView.swift; sourceTree = SOURCE_ROOT; };
+		B1A1A012C0FF000100000001 /* Sources/PantherSDKBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/PantherSDKBridge.swift; sourceTree = SOURCE_ROOT; };
+		B1A1A013C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/PantherSampleSwiftApp.swift; sourceTree = SOURCE_ROOT; };
+		B1A1A014C0FF000100000001 /* Sources/Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Sources/Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
+		B1A1A020C0FF000100000001 /* include/panther.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/panther.h; sourceTree = SOURCE_ROOT; };
+		B1A1A021C0FF000100000001 /* libs/libpanther_ffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libs/libpanther_ffi.a; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B1A1A100C0FF000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1A1A004C0FF000100000001 /* libs/libpanther_ffi.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B1A1A200C0FF000100000001 = {
+			isa = PBXGroup;
+			children = (
+				B1A1A210C0FF000100000001 /* Sources */,
+				B1A1A220C0FF000100000001 /* include */,
+				B1A1A230C0FF000100000001 /* libs */,
+				B1A1A010C0FF000100000001 /* Info.plist */,
+				90543A8F2E96F022001379E2 /* PantherSampleSwift.app */,
+			);
+			sourceTree = "<group>";
+		};
+		B1A1A210C0FF000100000001 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				B1A1A011C0FF000100000001 /* Sources/ContentView.swift */,
+				B1A1A012C0FF000100000001 /* Sources/PantherSDKBridge.swift */,
+				B1A1A013C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift */,
+				B1A1A014C0FF000100000001 /* Sources/Bridging-Header.h */,
+			);
+			path = Sources;
+			sourceTree = SOURCE_ROOT;
+		};
+		B1A1A220C0FF000100000001 /* include */ = {
+			isa = PBXGroup;
+			children = (
+				B1A1A020C0FF000100000001 /* include/panther.h */,
+			);
+			path = include;
+			sourceTree = SOURCE_ROOT;
+		};
+		B1A1A230C0FF000100000001 /* libs */ = {
+			isa = PBXGroup;
+			children = (
+				B1A1A021C0FF000100000001 /* libs/libpanther_ffi.a */,
+			);
+			path = libs;
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B1A1A300C0FF000100000001 /* PantherSampleSwift */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1A1A600C0FF000100000001 /* Build configuration list for PBXNativeTarget "PantherSampleSwift" */;
+			buildPhases = (
+				B1A1A400C0FF000100000001 /* Sources */,
+				B1A1A100C0FF000100000001 /* Frameworks */,
+				B1A1A500C0FF000100000001 /* Run Script - Build Rust FFI */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PantherSampleSwift;
+			productName = PantherSampleSwift;
+			productReference = 90543A8F2E96F022001379E2 /* PantherSampleSwift.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B1A1A700C0FF000100000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = B1A1A800C0FF000100000001 /* Build configuration list for PBXProject "PantherSampleSwift" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = B1A1A200C0FF000100000001;
+			productRefGroup = B1A1A200C0FF000100000001;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B1A1A300C0FF000100000001 /* PantherSampleSwift */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		B1A1A500C0FF000100000001 /* Run Script - Build Rust FFI */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script - Build Rust FFI";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bash \"${SRCROOT}/scripts/build_rust.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B1A1A400C0FF000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1A1A003C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift in Sources */,
+				B1A1A001C0FF000100000001 /* Sources/ContentView.swift in Sources */,
+				B1A1A002C0FF000100000001 /* Sources/PantherSDKBridge.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+			B1A1A900C0FF000100000001 /* Debug */ = {
+				isa = XCBuildConfiguration;
+				buildSettings = {
+					ALWAYS_SEARCH_USER_PATHS = NO;
+					CLANG_ENABLE_OBJC_ARC = YES;
+					CODE_SIGN_STYLE = Automatic;
+					ENABLE_BITCODE = NO;
+					HEADER_SEARCH_PATHS = "$(SRCROOT)/include";
+					INFOPLIST_FILE = Info.plist;
+					IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+					LD_RUNPATH_SEARCH_PATHS = (
+						"$(inherited)",
+						"@executable_path/Frameworks",
+					);
+					LIBRARY_SEARCH_PATHS = "$(SRCROOT)/libs";
+					PRODUCT_BUNDLE_IDENTIFIER = com.example.PantherSampleSwift;
+					PRODUCT_NAME = "$(TARGET_NAME)";
+					SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+					SUPPORTS_MACCATALYST = NO;
+					SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/Sources/Bridging-Header.h";
+					SWIFT_VERSION = 5.0;
+					TARGETED_DEVICE_FAMILY = 1;
+					SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+					SWIFT_COMPILATION_MODE = singlefile;
+				};
+				name = Debug;
+			};
+			B1A1AA00C0FF000100000001 /* Release */ = {
+				isa = XCBuildConfiguration;
+				buildSettings = {
+					ALWAYS_SEARCH_USER_PATHS = NO;
+					CLANG_ENABLE_OBJC_ARC = YES;
+					CODE_SIGN_STYLE = Automatic;
+					ENABLE_BITCODE = NO;
+					HEADER_SEARCH_PATHS = "$(SRCROOT)/include";
+					INFOPLIST_FILE = Info.plist;
+					IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+					LD_RUNPATH_SEARCH_PATHS = (
+						"$(inherited)",
+						"@executable_path/Frameworks",
+					);
+					LIBRARY_SEARCH_PATHS = "$(SRCROOT)/libs";
+					PRODUCT_BUNDLE_IDENTIFIER = com.example.PantherSampleSwift;
+					PRODUCT_NAME = "$(TARGET_NAME)";
+					SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+					SUPPORTS_MACCATALYST = NO;
+					SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/Sources/Bridging-Header.h";
+					SWIFT_VERSION = 5.0;
+					TARGETED_DEVICE_FAMILY = 1;
+					SWIFT_OPTIMIZATION_LEVEL = "-O";
+					SWIFT_COMPILATION_MODE = wholemodule;
+				};
+				name = Release;
+			};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B1A1A600C0FF000100000001 /* Build configuration list for PBXNativeTarget "PantherSampleSwift" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1A1A900C0FF000100000001 /* Debug */,
+				B1A1AA00C0FF000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B1A1A800C0FF000100000001 /* Build configuration list for PBXProject "PantherSampleSwift" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B1A1A900C0FF000100000001 /* Debug */,
+				B1A1AA00C0FF000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B1A1A700C0FF000100000001 /* Project object */;
+}

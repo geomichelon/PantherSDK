@@ -1,0 +1,54 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+
+# Mac
+.DS_Store
+
+# iOS / Xcode
+DerivedData/
+*.xcworkspace/
+*.xcuserstate
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.moved-aside
+**/*.xcodeproj/xcuserdata/
+**/*.xcodeproj/project.xcworkspace/
+
+# Android / Gradle
+**/.gradle/
+**/local.properties
+**/captures/
+**/build/
+**/*.iml
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+.pub-cache/
+.pub/
+
+# Node / React Native
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# Generated headers (keep placeholder tracked)
+# If you want to ignore all generated headers, comment out the next line
+#!bindings/include/panther.h

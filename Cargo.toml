@@ -9,6 +9,7 @@ members = [
     "crates/panther-storage",
     "crates/panther-storage-sled",
     "panthersdk",
+    "crates/panther-validation",
 ]
 resolver = "2"
 

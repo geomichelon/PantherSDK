@@ -28,6 +28,17 @@ Java_com_example_panther_PantherBridge_metricsBleu(JNIEnv* env, jclass clazz, js
     return score;
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_example_panther_PantherBridge_validate(JNIEnv* env, jclass clazz, jstring prompt) {
+    (void)clazz;
+    const char* c_prompt = (*env)->GetStringUTFChars(env, prompt, 0);
+    char* out = panther_validation_run_default(c_prompt);
+    (*env)->ReleaseStringUTFChars(env, prompt, c_prompt);
+    jstring result = (*env)->NewStringUTF(env, out);
+    panther_free_string(out);
+    return result;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_example_panther_PantherBridge_recordMetric(JNIEnv* env, jclass clazz, jstring name) {
     (void)clazz;

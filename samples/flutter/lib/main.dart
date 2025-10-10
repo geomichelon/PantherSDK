@@ -16,6 +16,8 @@ class _MyAppState extends State<MyApp> {
   String output = '';
   String reference = '';
   double bleu = 0;
+  String validation = '';
+  String prompt = 'Explain insulin function';
 
   @override
   void initState() {
@@ -44,6 +46,20 @@ class _MyAppState extends State<MyApp> {
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: TextField(
+                  decoration: const InputDecoration(labelText: 'Prompt'),
+                  onChanged: (v) => prompt = v,
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() { validation = panther.validate(prompt); });
+                },
+                child: const Text('Validate'),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextField(
                   decoration: const InputDecoration(labelText: 'Reference'),
                   onChanged: (v) => reference = v,
                 ),
@@ -57,6 +73,9 @@ class _MyAppState extends State<MyApp> {
               const SizedBox(height: 8),
               Text('Output: ' + output),
               Text('BLEU: ' + bleu.toStringAsFixed(3)),
+              const SizedBox(height: 8),
+              const Text('Validation (JSON):'),
+              Text(validation),
             ],
           ),
         ),

@@ -45,4 +45,6 @@ char *panther_generate(const char *prompt_c);
 
 void panther_free_string(char *s);
 
+char *panther_validation_run_default(const char *prompt_c);
+
 #endif  /* PANTHER_SDK_H */

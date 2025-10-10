@@ -6,6 +6,7 @@ typedef _c_init = ffi.Int32 Function();
 typedef _c_generate = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>);
 typedef _c_free = ffi.Void Function(ffi.Pointer<ffi.Char>);
 typedef _c_metrics_bleu = ffi.Double Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_validate = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>);
 
 class PantherFFI {
   late final ffi.DynamicLibrary _lib;
@@ -13,6 +14,7 @@ class PantherFFI {
   late final _c_generate _generate;
   late final _c_free _free;
   late final _c_metrics_bleu _bleu;
+  late final _c_validate _validate;
 
   PantherFFI() {
     if (Platform.isAndroid) {
@@ -29,6 +31,7 @@ class PantherFFI {
     _generate = _lib.lookupFunction<_c_generate, _c_generate>('panther_generate');
     _free = _lib.lookupFunction<_c_free, _c_free>('panther_free_string');
     _bleu = _lib.lookupFunction<_c_metrics_bleu, _c_metrics_bleu>('panther_metrics_bleu');
+    _validate = _lib.lookupFunction<_c_validate, _c_validate>('panther_validation_run_default');
   }
 
   int init() => _init();
@@ -49,5 +52,14 @@ class PantherFFI {
     pkg_ffi.malloc.free(cRef);
     pkg_ffi.malloc.free(cCand);
     return score;
+  }
+
+  String validate(String prompt) {
+    final cPrompt = prompt.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final ptr = _validate(cPrompt.cast());
+    pkg_ffi.malloc.free(cPrompt);
+    final result = ptr.cast<pkg_ffi.Utf8>().toDartString();
+    _free(ptr);
+    return result;
   }
 }

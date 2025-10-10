@@ -238,3 +238,37 @@ pub extern "C" fn panther_free_string(s: *mut std::os::raw::c_char) {
         }
     }
 }
+
+// ---------- Validation (optional) ----------
+#[cfg(feature = "validation")]
+#[no_mangle]
+pub extern "C" fn panther_validation_run_default(prompt_c: *const c_char) -> *mut std::os::raw::c_char {
+    let prompt = unsafe { CStr::from_ptr(prompt_c).to_string_lossy().into_owned() };
+    let guidelines_json: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../panther-validation/guidelines/anvisa.json"));
+
+    // Build providers from env
+    let mut providers: Vec<(String, Arc<dyn panther_domain::ports::LlmProvider>)> = Vec::new();
+    #[cfg(feature = "validation-openai")]
+    if let Ok(p) = panther_validation::ProviderFactory::openai_from_env() { providers.push(p); }
+    #[cfg(feature = "validation-ollama")]
+    if let Ok(p) = panther_validation::ProviderFactory::ollama_from_env() { providers.push(p); }
+    if providers.is_empty() {
+        return rust_string_to_c("{\"error\":\"no providers configured\"}".to_string());
+    }
+
+    // Run async validator on a fresh runtime
+    let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build();
+    if rt.is_err() {
+        return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string());
+    }
+    let rt = rt.unwrap();
+    let res = rt.block_on(async move {
+        let validator = panther_validation::LLMValidator::from_json_str(guidelines_json, providers)?;
+        let results = validator.validate(&prompt).await?;
+        Ok::<String, anyhow::Error>(serde_json::to_string(&results)? )
+    });
+    match res {
+        Ok(s) => rust_string_to_c(s),
+        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+    }
+}

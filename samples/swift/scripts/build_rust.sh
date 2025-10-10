@@ -29,7 +29,7 @@ fi
 
 build_rust() {
   rustup target add aarch64-apple-ios-sim >/dev/null 2>&1 || true
-  (cd "$ROOT_DIR" && cargo build -p panther-ffi --features "metrics-inmemory storage-inmemory" --release --target aarch64-apple-ios-sim)
+  (cd "$ROOT_DIR" && cargo build -p panther-ffi --features "metrics-inmemory storage-inmemory validation validation-openai validation-ollama" --release --target aarch64-apple-ios-sim)
 }
 
 gen_header() {

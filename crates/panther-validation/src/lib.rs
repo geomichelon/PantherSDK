@@ -38,6 +38,11 @@ impl LLMValidator {
         Ok(Self { guidelines, providers })
     }
 
+    pub fn from_json_str(json: &str, providers: Vec<(String, Arc<dyn LlmProvider>)>) -> Result<Self> {
+        let guidelines: Vec<Guideline> = serde_json::from_str(json)?;
+        Ok(Self { guidelines, providers })
+    }
+
     pub async fn validate(&self, input_prompt: &str) -> Result<Vec<ValidationResult>> {
         let expected: Vec<String> = self
             .guidelines

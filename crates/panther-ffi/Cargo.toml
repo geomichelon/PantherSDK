@@ -13,6 +13,7 @@ ffi-support.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
+tokio.workspace = true
 panther-domain = { path = "../panther-domain" }
 panther-core = { path = "../panther-core" }
 panther-providers = { path = "../panther-providers" }
@@ -27,6 +28,9 @@ storage-sled = ["dep:panther-storage-sled"]
 metrics = ["metrics-inmemory"]
 storage = ["storage-inmemory"]
 observability = []
+validation = ["dep:panther-validation"]
+validation-openai = ["validation", "panther-validation/openai"]
+validation-ollama = ["validation", "panther-validation/ollama"]
 
 [dependencies.panther-metrics]
 path = "../panther-metrics"
@@ -38,4 +42,8 @@ optional = true
 
 [dependencies.panther-storage-sled]
 path = "../panther-storage-sled"
+optional = true
+
+[dependencies.panther-validation]
+path = "../panther-validation"
 optional = true

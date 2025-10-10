@@ -9,4 +9,5 @@ object PantherBridge {
     external fun recordMetric(name: String): Int
     external fun listStorageItems(): String
     external fun getLogs(): String
+    external fun validate(prompt: String): String
 }

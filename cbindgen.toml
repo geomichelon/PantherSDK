@@ -31,4 +31,5 @@ include = [
   "panther_storage_list_metrics",
   "panther_logs_get",
   "panther_logs_get_recent",
+  "panther_validation_run_default",
 ]

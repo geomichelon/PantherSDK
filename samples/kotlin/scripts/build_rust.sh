@@ -11,8 +11,8 @@ fi
 pushd "$ROOT_DIR" >/dev/null
 rustup target add aarch64-linux-android x86_64-linux-android >/dev/null 2>&1 || true
 
-cargo ndk -t arm64-v8a -o "$APP_DIR/src/main/jniLibs" build -p panther-ffi --features "metrics storage" --release
-cargo ndk -t x86_64     -o "$APP_DIR/src/main/jniLibs" build -p panther-ffi --features "metrics storage" --release
+cargo ndk -t arm64-v8a -o "$APP_DIR/src/main/jniLibs" build -p panther-ffi --features "metrics storage validation validation-openai validation-ollama" --release
+cargo ndk -t x86_64     -o "$APP_DIR/src/main/jniLibs" build -p panther-ffi --features "metrics storage validation validation-openai validation-ollama" --release
 
 if ! command -v cbindgen >/dev/null 2>&1; then
   cargo install cbindgen >/dev/null 2>&1 || true

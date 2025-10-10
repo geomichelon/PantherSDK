@@ -7,6 +7,7 @@ type PantherModuleType = {
   recordMetric(name: string): Promise<number>;
   listStorageItems(): Promise<string>;
   getLogs(): Promise<string>;
+  validate(prompt: string): Promise<string>;
 };
 
 const {PantherModule} = NativeModules as {PantherModule: PantherModuleType};
@@ -33,4 +34,8 @@ export async function listStorageItems(): Promise<string> {
 
 export async function getLogs(): Promise<string> {
   return PantherModule.getLogs();
+}
+
+export async function validate(prompt: string): Promise<string> {
+  return PantherModule.validate(prompt);
 }

@@ -17,8 +17,8 @@ if ! command -v cargo-ndk >/dev/null 2>&1; then
   cargo install cargo-ndk >/dev/null 2>&1 || true
 fi
 rustup target add aarch64-linux-android x86_64-linux-android >/dev/null 2>&1 || true
-cargo ndk -t arm64-v8a -o "$APP_DIR/android/app/src/main/jniLibs" build -p panther-ffi --features "metrics storage" --release || true
-cargo ndk -t x86_64     -o "$APP_DIR/android/app/src/main/jniLibs" build -p panther-ffi --features "metrics storage" --release || true
+cargo ndk -t arm64-v8a -o "$APP_DIR/android/app/src/main/jniLibs" build -p panther-ffi --features "metrics storage validation validation-openai validation-ollama" --release || true
+cargo ndk -t x86_64     -o "$APP_DIR/android/app/src/main/jniLibs" build -p panther-ffi --features "metrics storage validation validation-openai validation-ollama" --release || true
 
 # Header
 if ! command -v cbindgen >/dev/null 2>&1; then
@@ -31,4 +31,3 @@ popd >/dev/null
 
 echo "React Native: Rust artifacts prepared."
 popd >/dev/null
-

@@ -1,0 +1,15 @@
+[package]
+name = "panther-sandbox"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+panther-validation = { path = "../panther-validation", default-features = false, features = ["openai", "ollama"] }
+
+[features]
+default = ["openai", "ollama"]
+openai = []
+ollama = []
+

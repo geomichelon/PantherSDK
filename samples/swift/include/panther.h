@@ -56,4 +56,8 @@ char *panther_validation_run_ollama(const char *prompt_c, const char *base_c, co
 
 char *panther_validation_run_multi(const char *prompt_c, const char *providers_json_c);
 
+char *panther_validation_run_custom(const char *prompt_c,
+                                    const char *providers_json_c,
+                                    const char *guidelines_json_c);
+
 #endif  /* PANTHER_SDK_H */

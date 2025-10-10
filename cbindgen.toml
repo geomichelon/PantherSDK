@@ -35,4 +35,5 @@ include = [
   "panther_validation_run_openai",
   "panther_validation_run_ollama",
   "panther_validation_run_multi",
+  "panther_validation_run_custom",
 ]

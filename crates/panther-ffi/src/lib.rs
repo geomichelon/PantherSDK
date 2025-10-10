@@ -401,3 +401,73 @@ pub extern "C" fn panther_validation_run_multi(
     });
     match res { Ok(s) => rust_string_to_c(s), Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)), }
 }
+
+#[cfg(feature = "validation")]
+#[no_mangle]
+pub extern "C" fn panther_validation_run_custom(
+    prompt_c: *const c_char,
+    providers_json_c: *const c_char,
+    guidelines_json_c: *const c_char,
+) -> *mut std::os::raw::c_char {
+    let prompt = unsafe { CStr::from_ptr(prompt_c).to_string_lossy().into_owned() };
+    let providers_json = unsafe { CStr::from_ptr(providers_json_c).to_string_lossy().into_owned() };
+    let guidelines_json = unsafe { CStr::from_ptr(guidelines_json_c).to_string_lossy().into_owned() };
+
+    let cfgs: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&providers_json);
+    if let Err(e) = cfgs {
+        return rust_string_to_c(format!("{{\"error\":\"providers json invalid: {}\"}}", e));
+    }
+    let cfgs = cfgs.unwrap();
+
+    let mut providers: Vec<(String, Arc<dyn panther_domain::ports::LlmProvider>)> = Vec::new();
+    for entry in cfgs {
+        if let Some(ty) = entry.get("type").and_then(|v| v.as_str()) {
+            match ty {
+                #[cfg(feature = "validation-openai")]
+                "openai" => {
+                    if let (Some(base), Some(model)) = (
+                        entry.get("base_url").and_then(|v| v.as_str()),
+                        entry.get("model").and_then(|v| v.as_str()),
+                    ) {
+                        if let Some(api_key) = entry.get("api_key").and_then(|v| v.as_str()) {
+                            let prov = panther_providers::openai::OpenAiProvider {
+                                api_key: api_key.to_string(),
+                                model: model.to_string(),
+                                base_url: base.to_string(),
+                            };
+                            providers.push((format!("openai:{}", model), Arc::new(prov)));
+                        }
+                    }
+                }
+                #[cfg(feature = "validation-ollama")]
+                "ollama" => {
+                    if let (Some(base), Some(model)) = (
+                        entry.get("base_url").and_then(|v| v.as_str()),
+                        entry.get("model").and_then(|v| v.as_str()),
+                    ) {
+                        let prov = panther_providers::ollama::OllamaProvider {
+                            base_url: base.to_string(),
+                            model: model.to_string(),
+                        };
+                        providers.push((format!("ollama:{}", model), Arc::new(prov)));
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    if providers.is_empty() {
+        return rust_string_to_c("{\"error\":\"no providers configured\"}".to_string());
+    }
+
+    let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        Ok(r) => r,
+        Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
+    };
+    let res = rt.block_on(async move {
+        let validator = panther_validation::LLMValidator::from_json_str(&guidelines_json, providers)?;
+        let results = validator.validate(&prompt).await?;
+        Ok::<String, anyhow::Error>(serde_json::to_string(&results)? )
+    });
+    match res { Ok(s) => rust_string_to_c(s), Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)), }
+}

@@ -24,6 +24,7 @@ public class PantherModule extends ReactContextBaseJavaModule {
     private static native String listStorageItems();
     private static native String getLogs();
     private static native String validate(String prompt);
+    private static native String validateMulti(String prompt, String providersJson);
 
     @ReactMethod
     public void init(Promise promise) {
@@ -60,5 +61,10 @@ public class PantherModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void validate(String prompt, Promise promise) {
         promise.resolve(validate(prompt));
+    }
+
+    @ReactMethod
+    public void validateMulti(String prompt, String providersJson, Promise promise) {
+        promise.resolve(validateMulti(prompt, providersJson));
     }
 }

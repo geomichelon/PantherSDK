@@ -5,7 +5,8 @@ This folder contains IDE-openable samples for each platform that demonstrate cha
 Swift (iOS Simulator)
 - Path: samples/swift
 - Project generator: XcodeGen (`project.yml`).
-- UI: Buttons for Record Metric, Refresh Items (lists metric names), and Get Logs.
+- UI: Buttons for Record Metric, Refresh Items (lists metric names), Get Logs, and Validation.
+- Validation: White‑label — pick provider type and enter Base URL / Model / API Key (for OpenAI‑like). App calls a single FFI `panther_validation_run_multi` via a Swift façade (`PantherSDK`).
 - Steps:
   1) `rustup target add aarch64-apple-ios-sim`
   2) `cargo build -p panther-ffi --features "metrics-inmemory storage-inmemory" --release --target aarch64-apple-ios-sim`
@@ -15,7 +16,8 @@ Swift (iOS Simulator)
 Android (Kotlin JNI, Emulator)
 - Path: samples/kotlin/android
 - Build files: Kotlin DSL (`build.gradle.kts`, `settings.gradle.kts`).
-- UI: Buttons for Record Metric, List Items (metric names), and Get Logs.
+- UI: Buttons for Record Metric, List Items (metric names), Get Logs, plus fields for provider (type/base/model/key) and Validate.
+- Validation: White‑label — Kotlin `PantherSDK.make(listOf(LLM(...)))` then `validate(prompt)`.
 - Steps:
   1) `cargo install cargo-ndk`
   2) `rustup target add x86_64-linux-android`
@@ -25,7 +27,7 @@ Android (Kotlin JNI, Emulator)
 
 Flutter
 - Path: samples/flutter
-- Included: FFI bindings + example app sources and a generator script.
+- Included: FFI bindings + example app with fields for provider (type/base/model/key). Calls `validateMulti(prompt, providersJson)`.
 - Note: This sample uses Dart FFI directly. If you require platform channels with intermediate Swift/Kotlin layers, I can scaffold a plugin-style project on request.
 - Steps:
   1) Run `samples/flutter/GENERATE_PROJECT.sh`
@@ -35,8 +37,8 @@ Flutter
 React Native
 - Path: samples/react_native
 - Includes iOS Objective‑C module and Android Java + JNI wrappers with a JS module (`Panther.ts`).
+- Validation: Use `validateMulti(prompt, providersJson)` from `Panther.ts` (pass JSON array of providers as described above).
 - Steps:
   1) `samples/react_native/GENERATE_PROJECT.sh` to create a CLI RN project and copy scaffolding.
   2) Build platform libs and headers (as above), link iOS static lib + header, and place Android `.so` into `jniLibs`.
   3) Wire the native module (iOS add file to target; Android register in a package if needed). Use the exported JS functions to call into Rust.
-

@@ -17,9 +17,25 @@ LOG_FILE="$SAMPLE_DIR/build_rust.log"
 mkdir -p "$SAMPLE_DIR/libs" "$SAMPLE_DIR/include"
 
 # Fast path: if artifacts already exist, do nothing (keeps Xcode clean & fast)
+REQUIRED_SYMBOLS=(
+  "_panther_validation_run_custom"
+)
+
 if [ -f "$LIB_DST" ] && [ -f "$HDR_DST" ]; then
-  echo "Using prebuilt lib/header (skip Rust build)." >"$LOG_FILE"
-  exit 0
+  missing_symbol=0
+  for sym in "${REQUIRED_SYMBOLS[@]}"; do
+    if ! nm -gU "$LIB_DST" 2>/dev/null | grep -q "$sym"; then
+      missing_symbol=1
+      break
+    fi
+  done
+
+  if [ "$missing_symbol" -eq 0 ]; then
+    echo "Using prebuilt lib/header (skip Rust build)." >"$LOG_FILE"
+    exit 0
+  fi
+
+  echo "Prebuilt lib missing required symbols; rebuilding Rust artifacts." >"$LOG_FILE"
 fi
 
 # If cargo is not available, fail only if we don't have artifacts

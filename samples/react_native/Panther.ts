@@ -8,6 +8,7 @@ type PantherModuleType = {
   listStorageItems(): Promise<string>;
   getLogs(): Promise<string>;
   validate(prompt: string): Promise<string>;
+  validateMulti(prompt: string, providersJson: string): Promise<string>;
 };
 
 const {PantherModule} = NativeModules as {PantherModule: PantherModuleType};
@@ -38,4 +39,8 @@ export async function getLogs(): Promise<string> {
 
 export async function validate(prompt: string): Promise<string> {
   return PantherModule.validate(prompt);
+}
+
+export async function validateMulti(prompt: string, providersJson: string): Promise<string> {
+  return PantherModule.validateMulti(prompt, providersJson);
 }

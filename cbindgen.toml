@@ -32,4 +32,7 @@ include = [
   "panther_logs_get",
   "panther_logs_get_recent",
   "panther_validation_run_default",
+  "panther_validation_run_openai",
+  "panther_validation_run_ollama",
+  "panther_validation_run_multi",
 ]

@@ -8,6 +8,7 @@
  - (void)recordMetric:(NSString *)name resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)listStorageItems:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)getLogs:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)validate:(NSString *)prompt resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
 @end
 
 @implementation PantherModule
@@ -59,6 +60,18 @@ RCT_REMAP_METHOD(listStorageItems,
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
   char* out = panther_storage_list_metrics();
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+
+RCT_REMAP_METHOD(validate,
+                 validateWithPrompt:(NSString *)prompt
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  const char* cPrompt = [prompt UTF8String];
+  char* out = panther_validation_run_default(cPrompt);
   NSString* res = [NSString stringWithUTF8String:out];
   panther_free_string(out);
   resolve(res);

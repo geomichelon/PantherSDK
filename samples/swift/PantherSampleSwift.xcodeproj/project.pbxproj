@@ -7,9 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B1A1A001C0FF000100000001 /* Sources/ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1A011C0FF000100000001 /* Sources/ContentView.swift */; };
-		B1A1A002C0FF000100000001 /* Sources/PantherSDKBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1A012C0FF000100000001 /* Sources/PantherSDKBridge.swift */; };
-		B1A1A003C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1A013C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift */; };
+    B1A1A001C0FF000100000001 /* Sources/ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1A011C0FF000100000001 /* Sources/ContentView.swift */; };
+    /* B1A1A002C0FF000100000001 removed: bridge not compiled */
+    B1A1A003C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1A013C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift */; };
+    B1A1B015C0FF000100000001 /* Sources/PantherSDK.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A1B001C0FF000100000001 /* Sources/PantherSDK.swift */; };
 		B1A1A004C0FF000100000001 /* libs/libpanther_ffi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B1A1A021C0FF000100000001 /* libs/libpanther_ffi.a */; };
 /* End PBXBuildFile section */
 
@@ -17,9 +18,11 @@
 		90543A8F2E96F022001379E2 /* PantherSampleSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PantherSampleSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1A1A010C0FF000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = SOURCE_ROOT; };
 		B1A1A011C0FF000100000001 /* Sources/ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/ContentView.swift; sourceTree = SOURCE_ROOT; };
-		B1A1A012C0FF000100000001 /* Sources/PantherSDKBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/PantherSDKBridge.swift; sourceTree = SOURCE_ROOT; };
+    /* removed Sources/PantherSDKBridge.swift file reference */
+    B1A1B001C0FF000100000001 /* Sources/PantherSDK.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/PantherSDK.swift; sourceTree = SOURCE_ROOT; };
 		B1A1A013C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/PantherSampleSwiftApp.swift; sourceTree = SOURCE_ROOT; };
-		B1A1A014C0FF000100000001 /* Sources/Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Sources/Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
+    B1A1A014C0FF000100000001 /* Sources/Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Sources/Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
+    /* removed Panther.swift file reference */
 		B1A1A020C0FF000100000001 /* include/panther.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = include/panther.h; sourceTree = SOURCE_ROOT; };
 		B1A1A021C0FF000100000001 /* libs/libpanther_ffi.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libs/libpanther_ffi.a; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -47,17 +50,18 @@
 			);
 			sourceTree = "<group>";
 		};
-		B1A1A210C0FF000100000001 /* Sources */ = {
-			isa = PBXGroup;
-			children = (
-				B1A1A011C0FF000100000001 /* Sources/ContentView.swift */,
-				B1A1A012C0FF000100000001 /* Sources/PantherSDKBridge.swift */,
-				B1A1A013C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift */,
-				B1A1A014C0FF000100000001 /* Sources/Bridging-Header.h */,
-			);
-			path = Sources;
-			sourceTree = SOURCE_ROOT;
-		};
+    B1A1A210C0FF000100000001 /* Sources */ = {
+      isa = PBXGroup;
+      children = (
+        B1A1A011C0FF000100000001 /* Sources/ContentView.swift */,
+        /* PantherSDKBridge removed from group */
+        B1A1B001C0FF000100000001 /* Sources/PantherSDK.swift */,
+        B1A1A013C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift */,
+        B1A1A014C0FF000100000001 /* Sources/Bridging-Header.h */,
+      );
+      path = Sources;
+      sourceTree = SOURCE_ROOT;
+    };
 		B1A1A220C0FF000100000001 /* include */ = {
 			isa = PBXGroup;
 			children = (
@@ -138,16 +142,16 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		B1A1A400C0FF000100000001 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				B1A1A003C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift in Sources */,
-				B1A1A001C0FF000100000001 /* Sources/ContentView.swift in Sources */,
-				B1A1A002C0FF000100000001 /* Sources/PantherSDKBridge.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+    B1A1A400C0FF000100000001 /* Sources */ = {
+      isa = PBXSourcesBuildPhase;
+      buildActionMask = 2147483647;
+      files = (
+        B1A1A003C0FF000100000001 /* Sources/PantherSampleSwiftApp.swift in Sources */,
+        B1A1A001C0FF000100000001 /* Sources/ContentView.swift in Sources */,
+        B1A1B015C0FF000100000001 /* Sources/PantherSDK.swift in Sources */,
+      );
+      runOnlyForDeploymentPostprocessing = 0;
+    };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */

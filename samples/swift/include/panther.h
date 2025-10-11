@@ -45,4 +45,19 @@ char *panther_generate(const char *prompt_c);
 
 void panther_free_string(char *s);
 
+char *panther_validation_run_default(const char *prompt_c);
+
+char *panther_validation_run_openai(const char *prompt_c,
+                                    const char *api_key_c,
+                                    const char *model_c,
+                                    const char *base_c);
+
+char *panther_validation_run_ollama(const char *prompt_c, const char *base_c, const char *model_c);
+
+char *panther_validation_run_multi(const char *prompt_c, const char *providers_json_c);
+
+char *panther_validation_run_custom(const char *prompt_c,
+                                    const char *providers_json_c,
+                                    const char *guidelines_json_c);
+
 #endif  /* PANTHER_SDK_H */

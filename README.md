@@ -40,6 +40,21 @@ Python API Layer
 
 See `docs/ARCHITECTURE.md` for detailed layers and flows.
 
+White‑Label Validation
+- `panther-validation` compares LLM outputs vs. guidelines (e.g., ANVISA) and ranks by adherence.
+- FFI exports for apps (C ABI):
+  - `panther_validation_run_default(prompt)`
+  - `panther_validation_run_openai(prompt, api_key, model, base)`
+  - `panther_validation_run_ollama(prompt, base, model)`
+  - `panther_validation_run_multi(prompt, providers_json)` where `providers_json` is:
+    `[{"type":"openai","api_key":"sk-...","base_url":"https://api.openai.com","model":"gpt-4o-mini"},{"type":"ollama","base_url":"http://127.0.0.1:11434","model":"llama3"}]`
+
+Samples (quick tour)
+- iOS (Swift): `PantherSDK.make(llms:)` then `validate(prompt:)`; the UI lets you input URL/key/model for any provider.
+- Android (Kotlin): `PantherSDK.make(listOf(LLM(...)))` then `validate(prompt)`; fields in the sample build providers JSON.
+- Flutter: builds providers JSON and calls `validateMulti(prompt, providersJson)` via Dart FFI.
+- React Native: native module exposes `validateMulti(prompt, providersJson)` (see sample’s `Panther.ts`).
+
 Features and Adapters
 - Core remains independent of adapters; it depends only on domain ports.
 - FFI enables adapters via feature flags:

@@ -2,7 +2,13 @@ Bindings and Generation
 
 C Header (via cbindgen)
 - Generate the header: `cbindgen --crate panther-ffi --output bindings/include/panther.h`
-- Exposed functions: `panther_init`, `panther_version_string`, `panther_generate`, `panther_free_string`
+- Exposed functions (core): `panther_init`, `panther_version_string`, `panther_generate`, `panther_free_string`
+- Validation (white‑label):
+  - `panther_validation_run_default(prompt)`
+  - `panther_validation_run_openai(prompt, api_key, model, base)`
+  - `panther_validation_run_ollama(prompt, base, model)`
+  - `panther_validation_run_multi(prompt, providers_json)` where `providers_json` is a JSON array like:
+    `[{"type":"openai","api_key":"sk-...","base_url":"https://api.openai.com","model":"gpt-4o-mini"}]`
 
 iOS (Swift)
 - Add `panther.h` to the bridging header and link `libpanther_ffi`

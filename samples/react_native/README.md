@@ -9,11 +9,14 @@ API exposed by native module `PantherModule`:
 - `recordMetric(metricName)`
 - `listStorageItems()` -> JSON array
 - `getLogs()` -> JSON array
+- `validateMulti(prompt, providersJson)` -> JSON array of results
 
 What this sample does
 - Record Metric: calls `panther_metrics_record` through native module
 - List Items: returns metric names via `panther_storage_list_metrics`
 - Get Logs: returns in‑process logs via `panther_logs_get`
+- Validate (white‑label): call `validateMulti(prompt, providersJson)` with a JSON array of providers, e.g.:
+  `[{"type":"openai","api_key":"sk-...","base_url":"https://api.openai.com","model":"gpt-4o-mini"}]`
 
 iOS (Objective‑C module)
 1) Build iOS static lib + header

@@ -8,7 +8,11 @@ members = [
     "crates/panther-metrics",
     "crates/panther-storage",
     "crates/panther-storage-sled",
+    "crates/panther-cli",
+    "crates/panther-sandbox",
+    "crates/panther-ai-eval",
     "panthersdk",
+    "crates/panther-validation",
 ]
 resolver = "2"
 

@@ -11,12 +11,12 @@ if ! command -v cargo-ndk >/dev/null 2>&1; then
   cargo install cargo-ndk >/dev/null 2>&1 || true
 fi
 rustup target add aarch64-linux-android x86_64-linux-android >/dev/null 2>&1 || true
-cargo ndk -t arm64-v8a -o "$APP_DIR/android/app/src/main/jniLibs" build -p panther-ffi --features "metrics storage" --release || true
-cargo ndk -t x86_64     -o "$APP_DIR/android/app/src/main/jniLibs" build -p panther-ffi --features "metrics storage" --release || true
+cargo ndk -t arm64-v8a -o "$APP_DIR/android/app/src/main/jniLibs" build -p panther-ffi --features "metrics storage validation validation-openai validation-ollama" --release || true
+cargo ndk -t x86_64     -o "$APP_DIR/android/app/src/main/jniLibs" build -p panther-ffi --features "metrics storage validation validation-openai validation-ollama" --release || true
 
 # iOS Simulator staticlib (optional for simulator runs)
 rustup target add aarch64-apple-ios-sim >/dev/null 2>&1 || true
-cargo build -p panther-ffi --features "metrics storage" --release --target aarch64-apple-ios-sim || true
+cargo build -p panther-ffi --features "metrics storage validation validation-openai validation-ollama" --release --target aarch64-apple-ios-sim || true
 mkdir -p "$APP_DIR/ios/libs" || true
 cp "target/aarch64-apple-ios-sim/release/libpanther_ffi.a" "$APP_DIR/ios/libs/" || true
 
@@ -31,4 +31,3 @@ popd >/dev/null
 
 echo "Flutter: Rust artifacts prepared."
 popd >/dev/null
-

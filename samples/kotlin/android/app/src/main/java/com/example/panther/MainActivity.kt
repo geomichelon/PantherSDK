@@ -66,6 +66,11 @@ class MainActivity : AppCompatActivity() {
         val backendBaseInput = EditText(this).apply { hint = "API Base (e.g. http://10.0.2.2:8000)" }
         val backendKeyInput = EditText(this).apply { hint = "API Key (X-API-Key, optional)" }
         val btnAnchor = Button(this).apply { text = "Anchor Proof" }
+        val btnStatus = Button(this).apply { text = "Check Status" }
+        val btnOpenExplorer = Button(this).apply { text = "View on Explorer" }
+        val btnOpenContract = Button(this).apply { text = "View Contract" }
+        var lastExplorerUrl: String? = null
+        var lastContractUrl: String? = null
         val outputView = TextView(this)
 
         var currentPreset = presets.first()
@@ -126,6 +131,9 @@ class MainActivity : AppCompatActivity() {
             addView(backendKeyInput)
             addView(btnValidate)
             addView(btnAnchor)
+            addView(btnStatus)
+            addView(btnOpenExplorer)
+            addView(btnOpenContract)
             addView(outputView)
         }
         setContentView(layout)
@@ -200,8 +208,10 @@ class MainActivity : AppCompatActivity() {
                     val res = conn.inputStream.bufferedReader().use { it.readText() }
                     val obj = org.json.JSONObject(res)
                     val tx = obj.optString("tx_hash", null)
+                    val ex = obj.optString("explorer_url", null)
                     runOnUiThread {
                         outputView.text = outputView.text.toString() + (if (tx != null) "\nAnchored tx: $tx" else "\nAnchor failed")
+                        lastExplorerUrl = ex
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
@@ -211,6 +221,53 @@ class MainActivity : AppCompatActivity() {
             }.start()
             // Save backend prefs
             prefs.edit().putString("api.base", backendBaseInput.text.toString().trim()).putString("api.key", backendKeyInput.text.toString().trim()).apply()
+        }
+
+        btnStatus.setOnClickListener {
+            val proof = lastProof
+            if (proof == null) {
+                outputView.text = outputView.text.toString() + "\nNo proof to check."
+                return@setOnClickListener
+            }
+            Thread {
+                try {
+                    val base = backendBaseInput.text.toString().trim().ifBlank { if (android.os.Build.FINGERPRINT.contains("generic")) "http://10.0.2.2:8000" else "http://127.0.0.1:8000" }
+                    val url = java.net.URL("$base/proof/status?hash=0x$proof")
+                    val conn = (url.openConnection() as java.net.HttpURLConnection)
+                    val key = backendKeyInput.text.toString().trim()
+                    if (key.isNotEmpty()) conn.setRequestProperty("X-API-Key", key)
+                    val res = conn.inputStream.bufferedReader().use { it.readText() }
+                    val obj = org.json.JSONObject(res)
+                    val anchored = obj.optBoolean("anchored", false)
+                    val cu = obj.optString("contract_url", null)
+                    runOnUiThread {
+                        outputView.text = outputView.text.toString() + "\nAnchored: $anchored"
+                        lastContractUrl = cu
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread { outputView.text = outputView.text.toString() + "\nStatus error: ${e.message}" }
+                }
+            }.start()
+        }
+
+        btnOpenExplorer.setOnClickListener {
+            val url = lastExplorerUrl
+            if (url != null) {
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                startActivity(intent)
+            } else {
+                outputView.text = outputView.text.toString() + "\nNo explorer URL."
+            }
+        }
+
+        btnOpenContract.setOnClickListener {
+            val url = lastContractUrl
+            if (url != null) {
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                startActivity(intent)
+            } else {
+                outputView.text = outputView.text.toString() + "\nNo contract URL."
+            }
         }
     }
 

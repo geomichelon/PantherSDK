@@ -51,6 +51,7 @@ Validation
   - `panther_validation_run_multi(prompt, providers_json)` to support white‑label provider lists.
   - Stage 1 (proofs offline):
     - `panther_validation_run_multi_with_proof(prompt, providers_json)` → `{ results, proof }`
+    - `panther_validation_run_custom_with_proof(prompt, providers_json, guidelines_json)` → `{ results, proof }`
     - `panther_proof_compute(prompt, providers_json, guidelines_json, results_json, salt)` → `proof`
     - `panther_proof_verify_local(prompt, providers_json, guidelines_json, results_json, salt, proof_json)` → `i32` (1 válido)
   - Stage 2 (blockchain, opcional – feature `blockchain-eth`):
@@ -85,6 +86,9 @@ Proofs & Blockchain (Auditoria)
 - Stage 2 (On‑chain):
   - Contrato `ProofRegistry` (docs/contracts/ProofRegistry.sol) ancora apenas o hash (bytes32) no blockchain (ex.: testnets Ethereum/Polygon).
   - API Python expõe `/proof/anchor` e `/proof/status`; chaves privadas ficam somente no backend.
+- Stage 3 (Ops & UX):
+  - API fornece histórico (`/proof/history`) com eventos de `anchor`/`status` (em memória, com limite), além de `explorer_url`/`contract_url` quando configurado `PANTHER_EXPLORER_BASE`.
+  - Samples incluem botões “Check Status” e abrem links para explorer/contrato quando disponíveis.
 
 Platform Facades (Samples)
 - iOS (Swift): `PantherSDK` facade wraps the FFI and exposes:

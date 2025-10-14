@@ -52,7 +52,7 @@ fi
 build_rust() {
   rustup target add aarch64-apple-ios-sim >/dev/null 2>&1 || true
   # Build quietly to a log to avoid noisy Xcode issue list
-  (cd "$ROOT_DIR" && cargo build -p panther-ffi --features "metrics-inmemory storage-inmemory validation validation-openai validation-ollama" --release --target aarch64-apple-ios-sim) >"$LOG_FILE" 2>&1
+  (cd "$ROOT_DIR" && cargo build -p panther-ffi --features "metrics-inmemory storage-inmemory validation validation-openai validation-ollama validation-async validation-openai-async validation-ollama-async" --release --target aarch64-apple-ios-sim) >"$LOG_FILE" 2>&1
 }
 
 gen_header() {

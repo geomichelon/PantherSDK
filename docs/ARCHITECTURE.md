@@ -10,7 +10,7 @@ Layers
 - Domain (`panther-domain`)
   - Entities: `Prompt`, `Completion`, `ModelSpec`, `TraceEvent`
   - Errors and result types
-  - Ports (traits): `LlmProvider`, `TelemetrySink`
+  - Ports (traits): `LlmProvider` (sync), `LlmProviderAsync` (async), `TelemetrySink`
 - Application (`panther-core`)
   - Use cases: generation, evaluation, policies, model routing
   - Orchestrates `LlmProvider` and `TelemetrySink`
@@ -109,6 +109,7 @@ Build/Features
 - Enable validation features in the FFI crate to include providers:
   - `validation` (core glue)
   - `validation-openai` and/or `validation-ollama`
+  - Async providers (Stage 4): enable `panther-providers/openai-async` e/ou `panther-providers/ollama-async` e utilize `LlmProviderAsync` no core/validador.
 - Samples’ build scripts include these features when rebuilding the static/shared library.
 
 Error Handling

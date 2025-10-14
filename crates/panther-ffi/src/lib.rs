@@ -243,6 +243,120 @@ pub extern "C" fn panther_free_string(s: *mut std::os::raw::c_char) {
 // ---------- Validation (optional) ----------
 #[cfg(feature = "validation")]
 #[no_mangle]
+pub extern "C" fn panther_validation_run_custom_with_proof(
+    prompt_c: *const c_char,
+    providers_json_c: *const c_char,
+    guidelines_json_c: *const c_char,
+) -> *mut std::os::raw::c_char {
+    let prompt = unsafe { CStr::from_ptr(prompt_c).to_string_lossy().into_owned() };
+    let providers_json = unsafe { CStr::from_ptr(providers_json_c).to_string_lossy().into_owned() };
+    let guidelines_json = unsafe { CStr::from_ptr(guidelines_json_c).to_string_lossy().into_owned() };
+
+    #[derive(serde::Deserialize)]
+    struct ProviderCfg { #[serde(rename = "type")] ty: String, base_url: Option<String>, model: Option<String>, api_key: Option<String> }
+    let cfgs: Result<Vec<ProviderCfg>, _> = serde_json::from_str(&providers_json);
+    if let Err(e) = cfgs { return rust_string_to_c(format!("{{\"error\":\"providers json invalid: {}\"}}", e)); }
+    let cfgs = cfgs.unwrap();
+
+    // Try async providers first
+    #[cfg(feature = "validation-async")]
+    {
+        let mut providers_async: Vec<(String, Arc<dyn panther_domain::ports::LlmProviderAsync>)> = Vec::new();
+        for c in &cfgs {
+            match c.ty.as_str() {
+                #[cfg(feature = "validation-openai-async")]
+                "openai" => {
+                    if let (Some(key), Some(model)) = (c.api_key.clone(), c.model.clone()) {
+                        let base = c.base_url.clone().unwrap_or_else(|| "https://api.openai.com".to_string());
+                        let p = panther_providers::openai_async::OpenAiProviderAsync { api_key: key, model: model.clone(), base_url: base, timeout_secs: 30, retries: 2 };
+                        providers_async.push((format!("openai:{}", model), Arc::new(p)));
+                    }
+                }
+                #[cfg(feature = "validation-ollama-async")]
+                "ollama" => {
+                    if let (Some(base), Some(model)) = (c.base_url.clone(), c.model.clone()) {
+                        let p = panther_providers::ollama_async::OllamaProviderAsync { base_url: base, model: model.clone(), timeout_secs: 30, retries: 2 };
+                        providers_async.push((format!("ollama:{}", model), Arc::new(p)));
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !providers_async.is_empty() {
+            let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+                Ok(r) => r,
+                Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
+            };
+            let prompt_clone = prompt.clone();
+            let providers_json_clone = providers_json.clone();
+            let guidelines_json_clone = guidelines_json.clone();
+            let res = rt.block_on(async move {
+                let validator = panther_validation::LLMValidatorAsync::from_json_str(&guidelines_json_clone, providers_async)?;
+                let results = validator.validate(&prompt_clone).await?;
+                Ok::<Vec<panther_validation::ValidationResult>, anyhow::Error>(results)
+            });
+            return match res {
+                Ok(results) => {
+                    let results_json = serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_string());
+                    let ctx = panther_validation::proof::ProofContext { sdk_version: env!("CARGO_PKG_VERSION").to_string(), salt: None };
+                    let proof = match panther_validation::proof::compute_proof(&prompt, &providers_json_clone, &guidelines_json, &results_json, &ctx) {
+                        Ok(p) => p,
+                        Err(e) => return rust_string_to_c(format!("{{\"error\":\"compute proof failed: {}\"}}", e)),
+                    };
+                    let out = serde_json::json!({ "results": results, "proof": proof });
+                    rust_string_to_c(serde_json::to_string(&out).unwrap_or_else(|_| "{}".to_string()))
+                }
+                Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+            };
+        }
+    }
+
+    // Fallback to synchronous providers
+    let mut providers: Vec<(String, Arc<dyn panther_domain::ports::LlmProvider>)> = Vec::new();
+    for c in cfgs {
+        match c.ty.as_str() {
+            #[cfg(feature = "validation-openai")]
+            "openai" => {
+                if let (Some(key), Some(model)) = (c.api_key.clone(), c.model.clone()) {
+                    let base = c.base_url.unwrap_or_else(|| "https://api.openai.com".to_string());
+                    let p = panther_providers::openai::OpenAiProvider { api_key: key, model: model.clone(), base_url: base };
+                    providers.push((format!("openai:{}", model), Arc::new(p)));
+                }
+            }
+            #[cfg(feature = "validation-ollama")]
+            "ollama" => {
+                if let (Some(base), Some(model)) = (c.base_url.clone(), c.model.clone()) {
+                    let p = panther_providers::ollama::OllamaProvider { base_url: base, model: model.clone() };
+                    providers.push((format!("ollama:{}", model), Arc::new(p)));
+                }
+            }
+            _ => {}
+        }
+    }
+    if providers.is_empty() { return rust_string_to_c("{\"error\":\"no providers configured\"}".to_string()); }
+    let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        Ok(r) => r,
+        Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
+    };
+    let res = rt.block_on(async move {
+        let validator = panther_validation::LLMValidator::from_json_str(&guidelines_json, providers)?;
+        let results = validator.validate(&prompt).await?;
+        Ok::<Vec<panther_validation::ValidationResult>, anyhow::Error>(results)
+    });
+    match res {
+        Ok(results) => {
+            let results_json = serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_string());
+            let ctx = panther_validation::proof::ProofContext { sdk_version: env!("CARGO_PKG_VERSION").to_string(), salt: None };
+            let proof = match panther_validation::proof::compute_proof(&prompt, &providers_json, &guidelines_json, &results_json, &ctx) {
+                Ok(p) => p,
+                Err(e) => return rust_string_to_c(format!("{{\"error\":\"compute proof failed: {}\"}}", e)),
+            };
+            let out = serde_json::json!({ "results": results, "proof": proof });
+            rust_string_to_c(serde_json::to_string(&out).unwrap_or_else(|_| "{}".to_string()))
+        }
+        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+    }
+}
 pub extern "C" fn panther_validation_run_default(prompt_c: *const c_char) -> *mut std::os::raw::c_char {
     let prompt = unsafe { CStr::from_ptr(prompt_c).to_string_lossy().into_owned() };
     let guidelines_json: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../panther-validation/guidelines/anvisa.json"));
@@ -292,6 +406,59 @@ pub extern "C" fn panther_validation_run_multi_with_proof(
     if let Err(e) = cfgs { return rust_string_to_c(format!("{{\"error\":\"providers json invalid: {}\"}}", e)); }
     let cfgs = cfgs.unwrap();
 
+    // If async validation features are enabled, try building async providers first
+    #[cfg(feature = "validation-async")]
+    {
+        let mut providers_async: Vec<(String, Arc<dyn panther_domain::ports::LlmProviderAsync>)> = Vec::new();
+        for c in &cfgs {
+            match c.ty.as_str() {
+                #[cfg(feature = "validation-openai-async")]
+                "openai" => {
+                    if let (Some(key), Some(model)) = (c.api_key.clone(), c.model.clone()) {
+                        let base = c.base_url.clone().unwrap_or_else(|| "https://api.openai.com".to_string());
+                        let p = panther_providers::openai_async::OpenAiProviderAsync { api_key: key, model: model.clone(), base_url: base, timeout_secs: 30, retries: 2 };
+                        providers_async.push((format!("openai:{}", model), Arc::new(p)));
+                    }
+                }
+                #[cfg(feature = "validation-ollama-async")]
+                "ollama" => {
+                    if let (Some(base), Some(model)) = (c.base_url.clone(), c.model.clone()) {
+                        let p = panther_providers::ollama_async::OllamaProviderAsync { base_url: base, model: model.clone(), timeout_secs: 30, retries: 2 };
+                        providers_async.push((format!("ollama:{}", model), Arc::new(p)));
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !providers_async.is_empty() {
+            let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+                Ok(r) => r,
+                Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
+            };
+            let prompt_clone = prompt.clone();
+            let providers_json_clone = providers_json.clone();
+            let res = rt.block_on(async move {
+                let validator = panther_validation::LLMValidatorAsync::from_json_str(guidelines_json, providers_async)?;
+                let results = validator.validate(&prompt_clone).await?;
+                Ok::<Vec<panther_validation::ValidationResult>, anyhow::Error>(results)
+            });
+            return match res {
+                Ok(results) => {
+                    let results_json = serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_string());
+                    let ctx = panther_validation::proof::ProofContext { sdk_version: env!("CARGO_PKG_VERSION").to_string(), salt: None };
+                    let proof = match panther_validation::proof::compute_proof(&prompt, &providers_json_clone, guidelines_json, &results_json, &ctx) {
+                        Ok(p) => p,
+                        Err(e) => return rust_string_to_c(format!("{{\"error\":\"compute proof failed: {}\"}}", e)),
+                    };
+                    let out = serde_json::json!({ "results": results, "proof": proof });
+                    rust_string_to_c(serde_json::to_string(&out).unwrap_or_else(|_| "{}".to_string()))
+                }
+                Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+            };
+        }
+    }
+
+    // Fallback to synchronous providers if no async provider was built
     let mut providers: Vec<(String, Arc<dyn panther_domain::ports::LlmProvider>)> = Vec::new();
     for c in cfgs {
         match c.ty.as_str() {
@@ -326,20 +493,13 @@ pub extern "C" fn panther_validation_run_multi_with_proof(
     });
     match res {
         Ok(results) => {
-            // compute proof
             let results_json = serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_string());
-            let ctx = panther_validation::proof::ProofContext {
-                sdk_version: env!("CARGO_PKG_VERSION").to_string(),
-                salt: None,
-            };
+            let ctx = panther_validation::proof::ProofContext { sdk_version: env!("CARGO_PKG_VERSION").to_string(), salt: None };
             let proof = match panther_validation::proof::compute_proof(&prompt, &providers_json, guidelines_json, &results_json, &ctx) {
                 Ok(p) => p,
                 Err(e) => return rust_string_to_c(format!("{{\"error\":\"compute proof failed: {}\"}}", e)),
             };
-            let out = serde_json::json!({
-                "results": results,
-                "proof": proof,
-            });
+            let out = serde_json::json!({ "results": results, "proof": proof });
             rust_string_to_c(serde_json::to_string(&out).unwrap_or_else(|_| "{}".to_string()))
         }
         Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),

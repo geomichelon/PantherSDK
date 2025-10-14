@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi import FastAPI, Depends, Header, HTTPException, Response
 import sys
 import platform
 import sqlite3
@@ -8,6 +8,18 @@ import json
 import os
 import ctypes
 from ctypes import c_char_p
+import time
+
+# Prometheus (optional)
+try:
+    from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    _PROM_ENABLED = True
+    MET_ANCHOR_REQ = Counter("panther_anchor_requests_total", "Total anchor requests")
+    MET_ANCHOR_OK = Counter("panther_anchor_success_total", "Total successful anchor operations")
+    MET_ANCHOR_LAT = Histogram("panther_anchor_latency_seconds", "Anchor latency (seconds)")
+    MET_STATUS_REQ = Counter("panther_status_checks_total", "Total status check requests")
+except Exception:
+    _PROM_ENABLED = False
 
 try:
     import pantherpy  # PyO3 module built with maturin
@@ -332,8 +344,21 @@ def create_app() -> FastAPI:
             return {"error": str(e)}
 
     # --- Validation (multi-provider) ---
+    # Prometheus validation metrics
+    try:
+        from prometheus_client import Counter, Histogram  # type: ignore
+        MET_VAL_REQ = Counter('panther_validation_requests_total', 'Total validation requests')
+        MET_VAL_ERR = Counter('panther_validation_errors_total', 'Total validation errors')
+        MET_VAL_ERR_L = Counter('panther_validation_errors_labeled_total', 'Validation errors by provider/category', ['provider','category'])
+        MET_VAL_LAT = Histogram('panther_validation_latency_seconds', 'Validation latency (seconds)')
+    except Exception:
+        MET_VAL_REQ = MET_VAL_ERR = MET_VAL_LAT = MET_VAL_ERR_L = None  # type: ignore
+
     @app.post("/validation/run_multi")
     def validation_run_multi(req: ValidateRequest, _auth=Depends(_auth_guard)):
+        import time as _t
+        if MET_VAL_REQ: MET_VAL_REQ.inc()
+        t0 = _t.time()
         providers = [
             {
                 "type": p.type,
@@ -369,10 +394,32 @@ def create_app() -> FastAPI:
                     })
                     if len(_AUDIT) > 200:
                         del _AUDIT[: len(_AUDIT) - 200]
+                    if MET_VAL_LAT: MET_VAL_LAT.observe(max(0.0, _t.time() - t0))
+                    # errors: adherence 0 + raw_text JSON {error:{category,...}}
+                    try:
+                        errc = 0
+                        for r in out:
+                            if r.get("adherence_score") == 0 and isinstance(r.get("raw_text"), str):
+                                txt = r["raw_text"].strip()
+                                if txt.startswith("{"):
+                                    errc += 1
+                                    if MET_VAL_ERR_L:
+                                        try:
+                                            data = json.loads(txt)
+                                            cat = data.get('error',{}).get('category','unknown')
+                                            MET_VAL_ERR_L.labels(r.get('provider_name','unknown'), cat).inc()
+                                        except Exception:
+                                            MET_VAL_ERR_L.labels(r.get('provider_name','unknown'), 'unknown').inc()
+                        if MET_VAL_ERR and errc > 0:
+                            MET_VAL_ERR.inc(errc)
+                    except Exception:
+                        pass
                 except Exception:
                     pass
                 return out
             except Exception as e:
+                if MET_VAL_LAT: MET_VAL_LAT.observe(max(0.0, _t.time() - t0))
+                if MET_VAL_ERR: MET_VAL_ERR.inc()
                 return {"error": str(e)}
         return {"error": "validation ffi unavailable"}
 
@@ -445,17 +492,27 @@ def create_app() -> FastAPI:
     # --- Proof anchoring (Stage 2) ---
     @app.post("/proof/anchor")
     def proof_anchor(body: dict, _auth=Depends(_auth_guard)):
+ feature/ProofSeal
+        if _PROM_ENABLED:
+            MET_ANCHOR_REQ.inc()
+        t0 = time.time()
+
         import time as _t
         if _PROM_ENABLED:
             MET_ANCHOR_REQ.inc()
         start = _t.time()
+main
         h = body.get("hash") or body.get("combined_hash")
         if not h:
             return {"error": "missing 'hash' (combined_hash)"}
         rpc = os.getenv("PANTHER_ETH_RPC")
         ctr = os.getenv("PANTHER_PROOF_CONTRACT")
         key = os.getenv("PANTHER_ETH_PRIVKEY")
+ feature/ProofSeal
+        exp = os.getenv("PANTHER_EXPLORER_BASE")
+
         exp = os.getenv("PANTHER_EXPLORER_BASE")  # e.g., https://sepolia.etherscan.io
+main
         if not (rpc and ctr and key):
             return {"error": "server not configured: set PANTHER_ETH_RPC, PANTHER_PROOF_CONTRACT, PANTHER_ETH_PRIVKEY"}
         if _RUST and hasattr(_RUST, "panther_proof_anchor_eth"):
@@ -466,6 +523,10 @@ def create_app() -> FastAPI:
                 tx = out.get("tx_hash")
                 if exp and isinstance(tx, str):
                     out["explorer_url"] = f"{exp.rstrip('/')}/tx/{tx}"
+feature/ProofSeal
+                if _PROM_ENABLED and isinstance(tx, str):
+                    MET_ANCHOR_OK.inc()
+
                 # history event
                 try:
                     _PROOF_HISTORY.append({
@@ -486,11 +547,15 @@ def create_app() -> FastAPI:
                     })
                 except Exception:
                     pass
+ main
                 return out
             finally:
                 _RUST.panther_free_string(s)
         if _PROM_ENABLED:
+feature/ProofSeal
+            MET_ANCHOR_LAT.observe(max(0.0, time.time() - t0))
             MET_ANCHOR_LAT.observe(max(0.0, _t.time() - start))
+ main
         return {"error": "blockchain FFI unavailable"}
 
     @app.get("/proof/status")
@@ -509,6 +574,8 @@ def create_app() -> FastAPI:
                 out = json.loads(data)
                 if exp and isinstance(ctr, str):
                     out["contract_url"] = f"{exp.rstrip('/')}/address/{ctr}"
+ feature/ProofSeal
+
                 # history event
                 try:
                     _PROOF_HISTORY.append({
@@ -529,6 +596,7 @@ def create_app() -> FastAPI:
                     })
                 except Exception:
                     pass
+ main
                 return out
             finally:
                 _RUST.panther_free_string(s)
@@ -538,6 +606,9 @@ def create_app() -> FastAPI:
     def metrics():
         if not _PROM_ENABLED:
             raise HTTPException(status_code=503, detail="prometheus not enabled")
+feature/ProofSeal
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)  # type: ignore
+
         data = generate_latest()  # type: ignore
         from fastapi import Response
         return Response(content=data, media_type=CONTENT_TYPE_LATEST)
@@ -579,6 +650,7 @@ def create_app() -> FastAPI:
             return items[: max(0, min(1000, limit))]
         except Exception as e:
             return {"error": str(e)}
+ main
 
     @app.post("/proof/verify")
     def proof_verify(body: dict, _auth=Depends(_auth_guard)):

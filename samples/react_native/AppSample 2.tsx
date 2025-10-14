@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {View, Text, TextInput, Button, ScrollView, Platform, StyleSheet, Linking} from 'react-native';
+import {View, Text, TextInput, Button, ScrollView, Platform, StyleSheet} from 'react-native';
 import {init, validateMultiWithProof, anchorProof} from './Panther';
 
 export default function AppSample() {
@@ -25,9 +25,6 @@ export default function AppSample() {
   const [lines, setLines] = useState<string[]>([]);
   const [proof, setProof] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [statusText, setStatusText] = useState<string | null>(null);
-  const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
-  const [contractUrl, setContractUrl] = useState<string | null>(null);
 
   useEffect(() => {
     init().catch(() => undefined);
@@ -61,25 +58,9 @@ export default function AppSample() {
     try {
       const resp = await anchorProof(proof, apiBase, apiKey || undefined);
       setTxHash(resp.tx_hash || null);
-      setExplorerUrl((resp as any).explorer_url || null);
       if (!resp.tx_hash && resp.error) setLines((prev) => [...prev, `Anchor error: ${resp.error}`]);
     } catch (e: any) {
       setLines((prev) => [...prev, `Anchor error: ${String(e?.message || e)}`]);
-    }
-  };
-
-  const checkStatus = async () => {
-    if (!proof) return;
-    try {
-      const base = apiBase || (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
-      const res = await fetch(`${base}/proof/status?hash=0x${proof}`, {
-        headers: apiKey ? {'X-API-Key': apiKey} : undefined,
-      });
-      const data = await res.json();
-      setStatusText(`Anchored: ${data.anchored ? 'true' : 'false'}`);
-      setContractUrl(data.contract_url || null);
-    } catch (e: any) {
-      setStatusText(`Status error: ${String(e?.message || e)}`);
     }
   };
 
@@ -112,19 +93,10 @@ export default function AppSample() {
         <Button title="Validate" onPress={runValidation} />
         {proof ? <View style={{width: 12}} /> : null}
         {proof ? <Button title="Anchor Proof" onPress={doAnchor} /> : null}
-        {proof ? <View style={{width: 12}} /> : null}
-        {proof ? <Button title="Check Status" onPress={checkStatus} /> : null}
       </View>
 
       {proof ? <Text style={styles.proof}>Proof: {proof}</Text> : null}
       {txHash ? <Text style={styles.proof}>Anchored tx: {txHash}</Text> : null}
-      {explorerUrl ? (
-        <Button title="View on Explorer" onPress={() => Linking.openURL(explorerUrl!)} />
-      ) : null}
-      {statusText ? <Text style={styles.proof}>{statusText}</Text> : null}
-      {contractUrl ? (
-        <Button title="View Contract" onPress={() => Linking.openURL(contractUrl!)} />
-      ) : null}
 
       <Text style={styles.h2}>Results</Text>
       {lines.map((l, i) => (
@@ -151,3 +123,4 @@ const styles = StyleSheet.create({
   line: {marginVertical: 2},
   proof: {fontSize: 12, color: '#666', marginTop: 8},
 });
+

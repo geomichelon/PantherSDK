@@ -63,6 +63,26 @@ public enum PantherSDK {
                 return json
             }
         }
+
+        public func validateWithProofRawJSON(prompt: String, guidelinesJSON: String? = nil) -> String {
+            if let guidelinesJSON = guidelinesJSON {
+                // For custom guidelines, reuse run_multi and compute proof on Python side if needed.
+                // Here we call multi+proof only for default guidelines.
+                return validateRawJSON(prompt: prompt, guidelinesJSON: guidelinesJSON)
+            } else {
+                guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "panther_validation_run_multi_with_proof") else {
+                    return "{\"error\":\"validation_with_proof unavailable\"}"
+                }
+                typealias F = @convention(c) (UnsafePointer<CChar>, UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
+                let f = unsafeBitCast(sym, to: F.self)
+                let p = prompt.cString(using: .utf8)!
+                let j = providersJSON.cString(using: .utf8)!
+                guard let ptr = f(p, j) else { return "{\"error\":\"ffi call failed\"}" }
+                let json = String(cString: ptr)
+                panther_free_string(ptr)
+                return json
+            }
+        }
     }
 
     public static func make(llms: [LLM]) -> Client { Client(providers: llms) }
@@ -88,6 +108,14 @@ public enum PantherSDK {
         guard let data = json.data(using: .utf8),
               let arr = try? JSONSerialization.jsonObject(with: data) as? [String] else { return [] }
         return arr
+    }
+
+    // MARK: - Version helper
+    public static func version() -> String {
+        guard let ptr = panther_version_string() else { return "" }
+        let s = String(cString: ptr)
+        panther_free_string(ptr)
+        return s
     }
 
     // MARK: - Guidelines cache & validation

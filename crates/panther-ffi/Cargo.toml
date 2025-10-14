@@ -32,6 +32,9 @@ validation = ["dep:panther-validation"]
 validation-openai = ["validation", "panther-validation/openai"]
 validation-ollama = ["validation", "panther-validation/ollama"]
 blockchain-eth = ["validation", "panther-validation/blockchain-eth"]
+validation-async = ["validation"]
+validation-openai-async = ["validation-async", "panther-validation/openai-async", "panther-providers/openai-async"]
+validation-ollama-async = ["validation-async", "panther-validation/ollama-async", "panther-providers/ollama-async"]
 
 [dependencies.panther-metrics]
 path = "../panther-metrics"

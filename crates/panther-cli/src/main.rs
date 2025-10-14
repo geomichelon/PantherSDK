@@ -50,8 +50,36 @@ async fn main() -> Result<()> {
                     r.latency_ms
                 );
             }
+            // Summary p50/p95 and error counts
+            if !results.is_empty() {
+                let mut lats: Vec<i64> = results.iter().map(|r| r.latency_ms).collect();
+                lats.sort();
+                let idx = |p: f64| -> usize {
+                    if lats.is_empty() { 0 } else { ((p * (lats.len() as f64 - 1.0)).round() as isize).clamp(0, (lats.len() as isize - 1)) as usize }
+                };
+                let p50 = lats[idx(0.50)];
+                let p95 = lats[idx(0.95)];
+                let mut err = 0usize;
+                for r in &results { if r.adherence_score == 0.0 && r.raw_text.starts_with("error") { err += 1; } }
+                println!("\nSummary: p50={} ms, p95={} ms, errors={}/{}", p50, p95, err, results.len());
+
+                // Per-provider error counts
+                use std::collections::HashMap;
+                let mut per: HashMap<String, (usize, usize, Vec<i64>)> = HashMap::new();
+                for r in &results {
+                    let e = per.entry(r.provider_name.clone()).or_insert((0,0,Vec::new()));
+                    e.0 += 1; // total
+                    if r.adherence_score == 0.0 && (r.raw_text.starts_with("error") || r.raw_text.starts_with("{")) { e.1 += 1; }
+                    e.2.push(r.latency_ms);
+                }
+                println!("\nBy provider:");
+                for (prov, (tot, errs, mut latv)) in per {
+                    latv.sort();
+                    let mid = latv[latv.len()/2];
+                    println!("  - {:<18} total={} errors={} p50={} ms", prov, tot, errs, mid);
+                }
+            }
         }
     }
     Ok(())
 }
-

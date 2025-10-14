@@ -9,6 +9,7 @@ serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 async-trait = "0.1"
+futures = "0.3"
 panther-domain = { path = "../panther-domain" }
 panther-providers = { path = "../panther-providers" }
 sha3 = "0.10"
@@ -18,6 +19,8 @@ hex = "0.4"
 default = []
 openai = ["panther-providers/openai"]
 ollama = ["panther-providers/ollama"]
+openai-async = ["panther-providers/openai-async"]
+ollama-async = ["panther-providers/ollama-async"]
 blockchain-eth = ["dep:ethers"]
 
 [[example]]

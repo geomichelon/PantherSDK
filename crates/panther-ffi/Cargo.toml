@@ -31,6 +31,7 @@ observability = []
 validation = ["dep:panther-validation"]
 validation-openai = ["validation", "panther-validation/openai"]
 validation-ollama = ["validation", "panther-validation/ollama"]
+blockchain-eth = ["validation", "panther-validation/blockchain-eth"]
 
 [dependencies.panther-metrics]
 path = "../panther-metrics"

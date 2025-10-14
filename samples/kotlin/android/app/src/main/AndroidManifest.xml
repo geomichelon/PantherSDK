@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.panther">
+    <uses-permission android:name="android.permission.INTERNET" />
     <application android:label="PantherSample" android:icon="@mipmap/ic_launcher">
         <activity android:name="com.example.panther.MainActivity">
             <intent-filter>

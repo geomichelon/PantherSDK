@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'ffi.dart';
 
@@ -18,6 +19,7 @@ class _MyAppState extends State<MyApp> {
   String reference = '';
   double bleu = 0;
   List<String> validationLines = [];
+  String? proofHash;
 
   final List<Map<String, dynamic>> providerPresets = [
     {'label': 'OpenAI', 'type': 'openai', 'base': 'https://api.openai.com', 'model': 'gpt-4o-mini', 'requiresKey': true},
@@ -37,6 +39,8 @@ class _MyAppState extends State<MyApp> {
   late TextEditingController apiKeyController;
   late TextEditingController localBaseController;
   late TextEditingController localModelController;
+  late TextEditingController apiBaseController;
+  late TextEditingController apiKeyControllerApi;
 
   @override
   void initState() {
@@ -48,6 +52,8 @@ class _MyAppState extends State<MyApp> {
     apiKeyController = TextEditingController();
     localBaseController = TextEditingController(text: 'http://127.0.0.1:11434');
     localModelController = TextEditingController(text: 'llama3');
+    apiBaseController = TextEditingController(text: (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000'));
+    apiKeyControllerApi = TextEditingController();
   }
 
   @override
@@ -58,6 +64,8 @@ class _MyAppState extends State<MyApp> {
     apiKeyController.dispose();
     localBaseController.dispose();
     localModelController.dispose();
+    apiBaseController.dispose();
+    apiKeyControllerApi.dispose();
     super.dispose();
   }
 
@@ -118,7 +126,8 @@ class _MyAppState extends State<MyApp> {
           }).cast<String>().toList();
           final proof = decoded['proof'] as Map<String, dynamic>?;
           if (proof != null && proof['combined_hash'] is String) {
-            validationLines.add('Proof: ${proof['combined_hash']}');
+            proofHash = proof['combined_hash'] as String;
+            validationLines.add('Proof: $proofHash');
           }
         });
         return;
@@ -200,10 +209,29 @@ class _MyAppState extends State<MyApp> {
                 ),
               ],
               const SizedBox(height: 12),
+              const Text('Backend API'),
+              TextField(
+                controller: apiBaseController,
+                decoration: const InputDecoration(labelText: 'API Base (e.g., http://127.0.0.1:8000)'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: apiKeyControllerApi,
+                decoration: const InputDecoration(labelText: 'API Key (X-API-Key, optional)'),
+                obscureText: true,
+              ),
+              const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: _runValidation,
                 child: const Text('Validate'),
               ),
+              if (proofHash != null) ...[
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: _anchorProof,
+                  child: const Text('Anchor Proof (API)'),
+                ),
+              ],
               const SizedBox(height: 16),
               TextField(
                 decoration: const InputDecoration(labelText: 'Reference (BLEU)'),
@@ -229,5 +257,32 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
     );
+  }
+
+  void _anchorProof() async {
+    final hash = proofHash;
+    if (hash == null) return;
+    final base = apiBaseController.text.trim().isEmpty
+        ? (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000')
+        : apiBaseController.text.trim();
+    final client = HttpClient();
+    try {
+      final req = await client.postUrl(Uri.parse('$base/proof/anchor'));
+      req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      final k = apiKeyControllerApi.text.trim();
+      if (k.isNotEmpty) req.headers.set('X-API-Key', k);
+      req.add(utf8.encode(jsonEncode({'hash': '0x$hash'})));
+      final resp = await req.close();
+      final body = await resp.transform(utf8.decoder).join();
+      final obj = jsonDecode(body) as Map<String, dynamic>;
+      final tx = obj['tx_hash'] as String?;
+      setState(() {
+        validationLines.add(tx != null ? 'Anchored tx: $tx' : 'Anchor failed');
+      });
+    } catch (e) {
+      setState(() { validationLines.add('Anchor error: $e'); });
+    } finally {
+      client.close(force: true);
+    }
   }
 }

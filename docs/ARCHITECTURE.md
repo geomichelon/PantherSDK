@@ -49,6 +49,13 @@ Validation
   - `panther_validation_run_openai(prompt, api_key, model, base)`
   - `panther_validation_run_ollama(prompt, base, model)`
   - `panther_validation_run_multi(prompt, providers_json)` to support white‑label provider lists.
+  - Stage 1 (proofs offline):
+    - `panther_validation_run_multi_with_proof(prompt, providers_json)` → `{ results, proof }`
+    - `panther_proof_compute(prompt, providers_json, guidelines_json, results_json, salt)` → `proof`
+    - `panther_proof_verify_local(prompt, providers_json, guidelines_json, results_json, salt, proof_json)` → `i32` (1 válido)
+  - Stage 2 (blockchain, opcional – feature `blockchain-eth`):
+    - `panther_proof_anchor_eth(hash_hex, rpc_url, contract_addr, priv_key)` → `{ tx_hash }`
+    - `panther_proof_check_eth(hash_hex, rpc_url, contract_addr)` → `{ anchored: bool }`
 
 White‑Label Providers
 - JSON schema for `providers_json` (passed to `run_multi`):
@@ -70,6 +77,14 @@ Validation Flow (Runtime)
   - adherence_score = 100% − missing_terms_penalty (based on guidelines)
 - FFI returns a JSON array of `ValidationResult` sorted by score.
 - App formats the results (e.g., `provider – 92.5% – 860 ms`).
+
+Proofs & Blockchain (Auditoria)
+- Stage 1 (Offline):
+  - O SDK calcula um `proof` com hashes SHA3‑512 sobre entradas (prompt, providers, guidelines, salt) e saídas (results), gera `combined_hash` e permite verificação local.
+  - Usos: auditoria local, integridade de relatórios, trilha reproduzível.
+- Stage 2 (On‑chain):
+  - Contrato `ProofRegistry` (docs/contracts/ProofRegistry.sol) ancora apenas o hash (bytes32) no blockchain (ex.: testnets Ethereum/Polygon).
+  - API Python expõe `/proof/anchor` e `/proof/status`; chaves privadas ficam somente no backend.
 
 Platform Facades (Samples)
 - iOS (Swift): `PantherSDK` facade wraps the FFI and exposes:

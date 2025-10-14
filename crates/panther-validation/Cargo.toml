@@ -18,7 +18,14 @@ hex = "0.4"
 default = []
 openai = ["panther-providers/openai"]
 ollama = ["panther-providers/ollama"]
+blockchain-eth = ["dep:ethers"]
 
 [[example]]
 name = "validate_llms"
 path = "examples/validate_llms.rs"
+
+[dependencies.ethers]
+version = "2"
+default-features = false
+features = ["abigen","contract","providers","signers","core","rustls"]
+optional = true

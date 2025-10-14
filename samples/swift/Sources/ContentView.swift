@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var prompt: String = "Explain insulin function"
     @State private var validation: [String] = []
     @State private var proofHash: String? = nil
+    @State private var txHash: String? = nil
 
     private struct ProviderPreset {
         let label: String
@@ -35,6 +36,9 @@ struct ContentView: View {
     @State private var guidelinesJSON: String = PantherSDK.Guidelines.defaultJSON
     @State private var useCustomGuidelines: Bool = false
     @State private var guidelineMessage: String?
+    // Backend API config
+    @State private var apiBase: String = "http://127.0.0.1:8000"
+    @State private var apiKeyHeader: String = ""
 
     var body: some View {
         NavigationView {
@@ -57,6 +61,13 @@ struct ContentView: View {
                     }
 
                     Divider()
+
+                    Text("Backend API")
+                        .font(.headline)
+                    TextField("API Base (e.g., http://127.0.0.1:8000)", text: $apiBase)
+                        .textFieldStyle(.roundedBorder)
+                    SecureField("API Key (X-API-Key) — optional", text: $apiKeyHeader)
+                        .textFieldStyle(.roundedBorder)
 
                     Text("Prompt")
                         .font(.headline)
@@ -121,6 +132,13 @@ struct ContentView: View {
                             Text("Proof: \(proof)")
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
+                            Button("Anchor Proof (API)") { anchorProof(hash: proof) }
+                                .buttonStyle(.bordered)
+                        }
+                        if let tx = txHash {
+                            Text("Anchored tx: \(tx)")
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
@@ -174,13 +192,35 @@ struct ContentView: View {
             }
             if let proof = obj["proof"] as? [String: Any], let ch = proof["combined_hash"] as? String {
                 proofHash = ch
+                txHash = nil
             } else {
                 proofHash = nil
+                txHash = nil
             }
         } else {
             // fallback to previous behavior
             validation = sdk.validate(prompt: prompt, guidelinesJSON: guidelines)
             proofHash = nil
+            txHash = nil
         }
+    }
+
+    private func anchorProof(hash: String) {
+        let base = apiBase.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: (base.isEmpty ? "http://127.0.0.1:8000" : base) + "/proof/anchor") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !apiKeyHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            req.setValue(apiKeyHeader, forHTTPHeaderField: "X-API-Key")
+        }
+        let body = ["hash": "0x" + hash]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            guard let data = data, err == nil,
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+            let tx = (obj["tx_hash"] as? String) ?? (obj["txHash"] as? String)
+            DispatchQueue.main.async { self.txHash = tx }
+        }.resume()
     }
 }

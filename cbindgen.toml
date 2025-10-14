@@ -39,4 +39,6 @@ include = [
   "panther_validation_run_multi_with_proof",
   "panther_proof_compute",
   "panther_proof_verify_local",
+  "panther_proof_anchor_eth",
+  "panther_proof_check_eth",
 ]

@@ -283,3 +283,78 @@ pub mod proof {
         }
     }
 }
+
+// ---- On-chain anchoring (Stage 2: Ethereum/Polygon testnet) ----
+#[cfg(feature = "blockchain-eth")]
+pub mod anchor_eth {
+    use super::*;
+    use ethers::abi::Abi;
+    use ethers::contract::Contract;
+    use ethers::middleware::SignerMiddleware;
+    use ethers::prelude::k256::ecdsa::SigningKey;
+    use ethers::prelude::Wallet;
+    use ethers::providers::{Http, Provider};
+    use ethers::signers::{LocalWallet, Signer};
+    use ethers::types::{Address, H256};
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct AnchorResult { pub tx_hash: String }
+
+    const ABI_JSON: &str = r#"[
+      {"inputs":[{"internalType":"bytes32","name":"h","type":"bytes32"}],"name":"anchor","outputs":[],"stateMutability":"nonpayable","type":"function"},
+      {"inputs":[{"internalType":"bytes32","name":"h","type":"bytes32"}],"name":"isAnchored","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+    ]"#;
+
+    fn h256_from_hex(s: &str) -> anyhow::Result<H256> {
+        let s = s.trim();
+        let s = s.strip_prefix("0x").unwrap_or(s);
+        let mut bytes = hex::decode(s)?;
+        if bytes.len() > 32 { anyhow::bail!("hash too long"); }
+        if bytes.len() < 32 {
+            let mut padded = vec![0u8; 32 - bytes.len()];
+            padded.extend(bytes);
+            bytes = padded;
+        }
+        Ok(H256::from_slice(&bytes))
+    }
+
+    pub async fn anchor_proof(
+        proof_hash_hex: &str,
+        rpc_url: &str,
+        contract_addr: &str,
+        priv_key_hex: &str,
+    ) -> anyhow::Result<AnchorResult> {
+        let provider = Provider::<Http>::try_from(rpc_url)?.interval(Duration::from_millis(1000));
+        let chain_id = provider.get_chainid().await?.as_u64();
+        let wallet: LocalWallet = LocalWallet::from_str(priv_key_hex)?.with_chain_id(chain_id);
+        let client = Arc::new(SignerMiddleware::new(provider, wallet));
+
+        let addr: Address = Address::from_str(contract_addr)?;
+        let abi: Abi = serde_json::from_str(ABI_JSON)?;
+        let contract = Contract::new(addr, abi, client);
+        let h = h256_from_hex(proof_hash_hex)?;
+
+        // anchor(bytes32)
+        let pending = contract.method::<_, ()>("anchor", h)?.send().await?;
+        let tx_hash = format!("{:#x}", pending.tx_hash());
+        // optional wait: let _receipt = pending.await?;
+        Ok(AnchorResult { tx_hash })
+    }
+
+    pub async fn is_anchored(
+        proof_hash_hex: &str,
+        rpc_url: &str,
+        contract_addr: &str,
+    ) -> anyhow::Result<bool> {
+        let provider = Provider::<Http>::try_from(rpc_url)?;
+        let addr: Address = Address::from_str(contract_addr)?;
+        let abi: Abi = serde_json::from_str(ABI_JSON)?;
+        let contract = Contract::new(addr, abi, Arc::new(provider));
+        let h = h256_from_hex(proof_hash_hex)?;
+        let anchored: bool = contract.method::<_, bool>("isAnchored", h)?.call().await?;
+        Ok(anchored)
+    }
+}

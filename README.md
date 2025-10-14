@@ -45,6 +45,8 @@ Python API Quickstart
 - Run the API:
   - From `python/`: `uvicorn panthersdk.api:create_app --host 0.0.0.0 --port 8000`
 - Optional API key: set `PANTHER_API_KEY=secret` and pass header `X-API-Key: secret` in requests.
+- Optional SQLite persistence for proof history:
+  - `PANTHER_SQLITE_PATH=./panther_proofs.db` (default)
 
 Curl examples
 - Health:
@@ -81,6 +83,14 @@ Curl examples
      http://localhost:8000/proof/compute | jq`
   - Resposta: objeto `proof` com `input_hash`, `results_hash` e `combined_hash`.
 
+- Proof status (Stage 3, UX)
+  - `curl -s -H 'X-API-Key: secret' "http://localhost:8000/proof/status?hash=0x<combined_hash>" | jq`
+  - Resposta: `{ "anchored": true|false, "contract_url": "…" }`
+  
+- Proof history (Stage 3)
+  - `curl -s -H 'X-API-Key: secret' "http://localhost:8000/proof/history?limit=50" | jq`
+  - Filtro por hash: `.../proof/history?hash=0x<combined_hash>`
+
 Docker Compose (optional)
 - Build Linux shared lib in a Rust container (outputs to `target/release`):
   - `docker compose run --rm ffi-build`
@@ -96,9 +106,10 @@ Blockchain Anchoring (Stage 2)
   - `PANTHER_ETH_RPC` — RPC URL (e.g., https://sepolia.infura.io/v3/…)
   - `PANTHER_PROOF_CONTRACT` — deployed ProofRegistry address
   - `PANTHER_ETH_PRIVKEY` — private key (use only on secure server)
+  - `PANTHER_EXPLORER_BASE` — explorer base URL (e.g., https://sepolia.etherscan.io)
 - Endpoints:
-  - `POST /proof/anchor` with `{ "hash": "0x…" }` → `{ "tx_hash": "0x…" }`
-  - `GET /proof/status?hash=0x…` → `{ "anchored": true|false }`
+  - `POST /proof/anchor` with `{ "hash": "0x…" }` → `{ "tx_hash": "0x…", "explorer_url": "<base>/tx/<tx>" }`
+  - `GET /proof/status?hash=0x…` → `{ "anchored": true|false, "contract_url": "<base>/address/<contract>" }`
 - Build FFI with blockchain (optional):
   - `cargo build -p panther-ffi --features "validation blockchain-eth" --release`
 
@@ -154,3 +165,15 @@ Async Runtime & Logging
 
 Local Database
 - Sled adapter: `crates/panther-storage-sled` with `SledStore::open(path)`
+
+Prometheus metrics (Stage 3)
+- Exposed at `/metrics` (Prometheus text format) when `prometheus_client` is installed.
+- Counters/Histograms:
+  - `panther_anchor_requests_total`, `panther_anchor_success_total`, `panther_anchor_latency_seconds`
+  - `panther_status_checks_total`
+- Install deps in `python/pyproject.toml` or `pip install prometheus_client`.
+
+CLI usage (panther-cli)
+- Validate: `panther validate "prompt here"`
+- Proof status: `panther proof status 0x<hash> --api-base http://127.0.0.1:8000 --api-key secret`
+- Proof history: `panther proof history --limit 50 --api-base http://127.0.0.1:8000`

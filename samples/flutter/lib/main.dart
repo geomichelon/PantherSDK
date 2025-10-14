@@ -22,10 +22,14 @@ class _MyAppState extends State<MyApp> {
   double bleu = 0;
   List<String> validationLines = [];
   String? proofHash;
+feature/ProofSeal
   String? explorerUrl;
   String? contractUrl;
   String? anchorStatus;
   String? explorerUrl;
+
+  String? anchorStatus;
+ main
 
   final List<Map<String, dynamic>> providerPresets = [
     {'label': 'OpenAI', 'type': 'openai', 'base': 'https://api.openai.com', 'model': 'gpt-4o-mini', 'requiresKey': true},
@@ -242,6 +246,7 @@ class _MyAppState extends State<MyApp> {
                   onPressed: _checkStatus,
                   child: const Text('Check Status (API)'),
                 ),
+feature/ProofSeal
                 if (explorerUrl != null) ...[
                   const SizedBox(height: 8),
                   ElevatedButton(
@@ -266,6 +271,8 @@ class _MyAppState extends State<MyApp> {
                     child: const Text('View Contract'),
                   ),
                 ],
+
+main
               ],
               const SizedBox(height: 16),
               TextField(
@@ -287,6 +294,7 @@ class _MyAppState extends State<MyApp> {
               const SizedBox(height: 16),
               const Text('Validation:'),
               ...validationLines.map((line) => Text(line)).toList(),
+              if (anchorStatus != null) Text(anchorStatus!),
             ],
           ),
         ),
@@ -337,12 +345,17 @@ class _MyAppState extends State<MyApp> {
       final resp = await req.close();
       final body = await resp.transform(utf8.decoder).join();
       final obj = jsonDecode(body) as Map<String, dynamic>;
+feature/ProofSeal
       final anchored = (obj['anchored'] as bool?) ?? false;
       final cu = obj['contract_url'] as String?;
       setState(() {
         anchorStatus = 'Anchored: ${anchored ? 'true' : 'false'}';
         contractUrl = cu;
       });
+
+      final anchored = obj['anchored'] as bool? ?? false;
+      setState(() { anchorStatus = 'Anchored: $anchored'; });
+main
     } catch (e) {
       setState(() { anchorStatus = 'Status error: $e'; });
     } finally {

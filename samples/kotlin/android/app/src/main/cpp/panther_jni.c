@@ -65,6 +65,21 @@ Java_com_example_panther_PantherBridge_validateMultiWithProof(JNIEnv* env, jclas
     return result;
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_example_panther_PantherBridge_validateCustomWithProof(JNIEnv* env, jclass clazz, jstring prompt, jstring providersJson, jstring guidelinesJson) {
+    (void)clazz;
+    const char* p = (*env)->GetStringUTFChars(env, prompt, 0);
+    const char* j = (*env)->GetStringUTFChars(env, providersJson, 0);
+    const char* g = (*env)->GetStringUTFChars(env, guidelinesJson, 0);
+    char* out = panther_validation_run_custom_with_proof(p, j, g);
+    (*env)->ReleaseStringUTFChars(env, prompt, p);
+    (*env)->ReleaseStringUTFChars(env, providersJson, j);
+    (*env)->ReleaseStringUTFChars(env, guidelinesJson, g);
+    jstring result = (*env)->NewStringUTF(env, out);
+    panther_free_string(out);
+    return result;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_example_panther_PantherBridge_recordMetric(JNIEnv* env, jclass clazz, jstring name) {
     (void)clazz;

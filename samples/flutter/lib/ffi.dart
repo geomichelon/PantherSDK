@@ -8,6 +8,8 @@ typedef _c_free = ffi.Void Function(ffi.Pointer<ffi.Char>);
 typedef _c_metrics_bleu = ffi.Double Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
 typedef _c_validate = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>);
 typedef _c_validate_multi = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_version = ffi.Pointer<ffi.Char> Function();
+typedef _c_validate_multi_with_proof = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
 
 class PantherFFI {
   late final ffi.DynamicLibrary _lib;
@@ -17,6 +19,8 @@ class PantherFFI {
   late final _c_metrics_bleu _bleu;
   late final _c_validate _validate;
   late final _c_validate_multi _validateMulti;
+  late final _c_version _version;
+  late final _c_validate_multi_with_proof _validateMultiWithProof;
 
   PantherFFI() {
     if (Platform.isAndroid) {
@@ -35,6 +39,8 @@ class PantherFFI {
     _bleu = _lib.lookupFunction<_c_metrics_bleu, _c_metrics_bleu>('panther_metrics_bleu');
     _validate = _lib.lookupFunction<_c_validate, _c_validate>('panther_validation_run_default');
     _validateMulti = _lib.lookupFunction<_c_validate_multi, _c_validate_multi>('panther_validation_run_multi');
+    _version = _lib.lookupFunction<_c_version, _c_version>('panther_version_string');
+    _validateMultiWithProof = _lib.lookupFunction<_c_validate_multi_with_proof, _c_validate_multi_with_proof>('panther_validation_run_multi_with_proof');
   }
 
   int init() => _init();
@@ -75,5 +81,23 @@ class PantherFFI {
     final result = ptr.cast<pkg_ffi.Utf8>().toDartString();
     _free(ptr);
     return result;
+  }
+
+  String validateMultiWithProof(String prompt, String providersJson) {
+    final cPrompt = prompt.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final cJson = providersJson.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final ptr = _validateMultiWithProof(cPrompt.cast(), cJson.cast());
+    pkg_ffi.malloc.free(cPrompt);
+    pkg_ffi.malloc.free(cJson);
+    final result = ptr.cast<pkg_ffi.Utf8>().toDartString();
+    _free(ptr);
+    return result;
+  }
+
+  String version() {
+    final ptr = _version();
+    final v = ptr.cast<pkg_ffi.Utf8>().toDartString();
+    _free(ptr);
+    return v;
   }
 }

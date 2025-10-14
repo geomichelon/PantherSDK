@@ -52,6 +52,19 @@ Java_com_example_panther_PantherBridge_validateMulti(JNIEnv* env, jclass clazz, 
     return result;
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_example_panther_PantherBridge_validateMultiWithProof(JNIEnv* env, jclass clazz, jstring prompt, jstring providersJson) {
+    (void)clazz;
+    const char* p = (*env)->GetStringUTFChars(env, prompt, 0);
+    const char* j = (*env)->GetStringUTFChars(env, providersJson, 0);
+    char* out = panther_validation_run_multi_with_proof(p, j);
+    (*env)->ReleaseStringUTFChars(env, prompt, p);
+    (*env)->ReleaseStringUTFChars(env, providersJson, j);
+    jstring result = (*env)->NewStringUTF(env, out);
+    panther_free_string(out);
+    return result;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_example_panther_PantherBridge_recordMetric(JNIEnv* env, jclass clazz, jstring name) {
     (void)clazz;
@@ -74,6 +87,15 @@ JNIEXPORT jstring JNICALL
 Java_com_example_panther_PantherBridge_getLogs(JNIEnv* env, jclass clazz) {
     (void)clazz;
     char* out = panther_logs_get();
+    jstring result = (*env)->NewStringUTF(env, out);
+    panther_free_string(out);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_example_panther_PantherBridge_version(JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    char* out = panther_version_string();
     jstring result = (*env)->NewStringUTF(env, out);
     panther_free_string(out);
     return result;

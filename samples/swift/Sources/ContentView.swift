@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var logs: [String] = []
     @State private var prompt: String = "Explain insulin function"
     @State private var validation: [String] = []
+    @State private var proofHash: String? = nil
 
     private struct ProviderPreset {
         let label: String
@@ -116,6 +117,11 @@ struct ContentView: View {
                         Text("Validation Results")
                             .font(.headline)
                         ForEach(validation, id: \.self) { Text($0) }
+                        if let proof = proofHash {
+                            Text("Proof: \(proof)")
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
                 .padding()
@@ -155,6 +161,26 @@ struct ContentView: View {
 
         let guidelines = useCustomGuidelines ? guidelinesJSON : nil
         let sdk = PantherSDK.make(llms: llms)
-        validation = sdk.validate(prompt: prompt, guidelinesJSON: guidelines)
+        // Prefer validation with proof when using default guidelines
+        let raw = sdk.validateWithProofRawJSON(prompt: prompt, guidelinesJSON: useCustomGuidelines ? guidelines : nil)
+        if let data = raw.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let arr = obj["results"] as? [[String: Any]] {
+            validation = arr.map { entry in
+                let name = entry["provider_name"] as? String ?? "?"
+                let score = (entry["adherence_score"] as? Double) ?? 0
+                let latency = (entry["latency_ms"] as? Int) ?? 0
+                return "\(name) – \(String(format: "%.1f", score))% – \(latency) ms"
+            }
+            if let proof = obj["proof"] as? [String: Any], let ch = proof["combined_hash"] as? String {
+                proofHash = ch
+            } else {
+                proofHash = nil
+            }
+        } else {
+            // fallback to previous behavior
+            validation = sdk.validate(prompt: prompt, guidelinesJSON: guidelines)
+            proofHash = nil
+        }
     }
 }

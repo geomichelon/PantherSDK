@@ -32,29 +32,6 @@ class PantherSDK private constructor(private val providersJson: String) {
         }
     }
 
-    fun validateAndGetProof(prompt: String, guidelinesJson: String? = null): Pair<List<String>, String?> {
-        if (guidelinesJson != null) {
-            val lines = validate(prompt, guidelinesJson)
-            return lines to null
-        }
-        val raw = PantherBridge.validateMultiWithProof(prompt, providersJson)
-        return try {
-            val obj = org.json.JSONObject(raw)
-            val arr = obj.getJSONArray("results")
-            val lines = (0 until arr.length()).map { i ->
-                val o = arr.getJSONObject(i)
-                val name = o.optString("provider_name", "?")
-                val score = o.optDouble("adherence_score", 0.0)
-                val lat = o.optInt("latency_ms", 0)
-                String.format("%s – %.1f%% – %d ms", name, score, lat)
-            }
-            val proof = obj.optJSONObject("proof")?.optString("combined_hash", null)
-            lines to proof
-        } catch (_: Throwable) {
-            listOf(raw) to null
-        }
-    }
-
     companion object {
         val defaultGuidelines: String = """\
 [
@@ -87,7 +64,5 @@ class PantherSDK private constructor(private val providersJson: String) {
             }
             return PantherSDK(arr.toString())
         }
-
-        fun version(): String = try { PantherBridge.version() } catch (_: Throwable) { "" }
     }
 }

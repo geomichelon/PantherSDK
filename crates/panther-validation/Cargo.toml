@@ -11,6 +11,8 @@ tokio.workspace = true
 async-trait = "0.1"
 panther-domain = { path = "../panther-domain" }
 panther-providers = { path = "../panther-providers" }
+sha3 = "0.10"
+hex = "0.4"
 
 [features]
 default = []

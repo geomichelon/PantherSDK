@@ -1,2 +1,33 @@
-    Finished `release` profile [optimized] target(s) in 0.24s
+   Compiling panther-domain v0.1.1 (/Users/georgemichelon/Desktop/PantherSDK/crates/panther-domain)
+   Compiling typenum v1.19.0
+   Compiling version_check v0.9.5
+   Compiling cpufeatures v0.2.17
+   Compiling hex v0.4.3
+   Compiling keccak v0.1.5
+   Compiling panther-providers v0.1.1 (/Users/georgemichelon/Desktop/PantherSDK/crates/panther-providers)
+   Compiling panther-core v0.1.1 (/Users/georgemichelon/Desktop/PantherSDK/crates/panther-core)
+   Compiling panther-storage-sled v0.1.1 (/Users/georgemichelon/Desktop/PantherSDK/crates/panther-storage-sled)
+   Compiling panther-metrics v0.1.1 (/Users/georgemichelon/Desktop/PantherSDK/crates/panther-metrics)
+   Compiling panther-observability v0.1.1 (/Users/georgemichelon/Desktop/PantherSDK/crates/panther-observability)
+   Compiling generic-array v0.14.9
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "/var/folders/j_/88b8wmdd0dv6f9r8z0b_9f1c0000gn/T/rustcvTcQpx/symbols.o" "<3 object files omitted>" "<sysroot>/lib/rustlib/aarch64-apple-darwin/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,libcfg_if-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-lSystem" "-lc" "-lm" "-arch" "arm64" "-mmacosx-version-min=11.0.0" "-o" "/Users/georgemichelon/Desktop/PantherSDK/target/release/build/typenum-528ea22ea270d0bb/build_script_build-528ea22ea270d0bb" "-Wl,-dead_strip" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: ld: library 'System' not found
+          cc: error: linker command failed with exit code 1 (use -v to see invocation)
+          
+
+error: could not compile `typenum` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "/var/folders/j_/88b8wmdd0dv6f9r8z0b_9f1c0000gn/T/rustcOA7Tl7/symbols.o" "<2 object files omitted>" "/Users/georgemichelon/Desktop/PantherSDK/target/release/deps/libversion_check-1fd17222472c96bd.rlib" "<sysroot>/lib/rustlib/aarch64-apple-darwin/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,libcfg_if-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-lSystem" "-lc" "-lm" "-arch" "arm64" "-mmacosx-version-min=11.0.0" "-o" "/Users/georgemichelon/Desktop/PantherSDK/target/release/build/generic-array-02eac0da8ded8643/build_script_build-02eac0da8ded8643" "-Wl,-dead_strip" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: ld: library 'System' not found
+          cc: error: linker command failed with exit code 1 (use -v to see invocation)
+          
+
+error: could not compile `generic-array` (build script) due to 1 previous error
+WARN: cargo build failed; using existing lib if present (see /Users/georgemichelon/Desktop/PantherSDK/samples/swift/build_rust.log)
 Rust FFI ready (using prebuilt or freshly built).

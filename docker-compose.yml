@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  ffi-build:
+    image: rust:1-bookworm
+    working_dir: /app
+    environment:
+      - FEATURES=metrics-inmemory storage-inmemory validation validation-openai validation-ollama
+    command: >
+      bash -lc "apt-get update && apt-get install -y --no-install-recommends pkg-config clang ca-certificates && \
+      cargo build -p panther-ffi --features \"$FEATURES\" --release && \
+      echo Built: /app/target/release/libpanther_ffi.so"
+    volumes:
+      - ./:/app
+
+  api:
+    image: python:3.11-slim
+    working_dir: /app/python
+    environment:
+      - PANTHER_API_KEY=${PANTHER_API_KEY:-}
+      - PYTHONUNBUFFERED=1
+    command: >
+      bash -lc "pip install -U pip && pip install -e . && uvicorn panthersdk.api:create_app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app

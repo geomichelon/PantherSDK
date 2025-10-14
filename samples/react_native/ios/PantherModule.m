@@ -9,6 +9,8 @@
  - (void)listStorageItems:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)getLogs:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)validate:(NSString *)prompt resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)validateMultiWithProof:(NSString *)prompt providersJson:(NSString *)providersJson resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)version:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
 @end
 
 @implementation PantherModule
@@ -77,11 +79,35 @@ RCT_REMAP_METHOD(validate,
   resolve(res);
 }
 
+RCT_REMAP_METHOD(validateMultiWithProof,
+                 validateWithProofPrompt:(NSString *)prompt
+                 providersJson:(NSString *)providersJson
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  const char* p = [prompt UTF8String];
+  const char* j = [providersJson UTF8String];
+  char* out = panther_validation_run_multi_with_proof(p, j);
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+
 RCT_REMAP_METHOD(getLogs,
                  getLogsWithResolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
 {
   char* out = panther_logs_get();
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+
+RCT_REMAP_METHOD(version,
+                 versionWithResolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  char* out = panther_version_string();
   NSString* res = [NSString stringWithUTF8String:out];
   panther_free_string(out);
   resolve(res);

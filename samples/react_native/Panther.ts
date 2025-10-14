@@ -9,6 +9,8 @@ type PantherModuleType = {
   getLogs(): Promise<string>;
   validate(prompt: string): Promise<string>;
   validateMulti(prompt: string, providersJson: string): Promise<string>;
+  version(): Promise<string>;
+  validateMultiWithProof(prompt: string, providersJson: string): Promise<string>;
 };
 
 const {PantherModule} = NativeModules as {PantherModule: PantherModuleType};
@@ -43,4 +45,12 @@ export async function validate(prompt: string): Promise<string> {
 
 export async function validateMulti(prompt: string, providersJson: string): Promise<string> {
   return PantherModule.validateMulti(prompt, providersJson);
+}
+
+export async function version(): Promise<string> {
+  return PantherModule.version();
+}
+
+export async function validateMultiWithProof(prompt: string, providersJson: string): Promise<string> {
+  return PantherModule.validateMultiWithProof(prompt, providersJson);
 }

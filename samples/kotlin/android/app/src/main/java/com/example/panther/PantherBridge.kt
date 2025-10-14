@@ -15,4 +15,6 @@ object PantherBridge {
     external fun validate(prompt: String): String
     external fun validateMulti(prompt: String, providersJson: String): String
     external fun validateCustom(prompt: String, providersJson: String, guidelinesJson: String): String
+    external fun version(): String
+    external fun validateMultiWithProof(prompt: String, providersJson: String): String
 }

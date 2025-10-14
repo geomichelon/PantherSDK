@@ -47,6 +47,14 @@ void panther_free_string(char *s);
 
 char *panther_validation_run_default(const char *prompt_c);
 
+char *panther_validation_run_multi_with_proof(const char *prompt_c, const char *providers_json_c);
+
+char *panther_proof_compute(const char *prompt_c,
+                            const char *providers_json_c,
+                            const char *guidelines_json_c,
+                            const char *results_json_c,
+                            const char *salt_c);
+
 char *panther_validation_run_openai(const char *prompt_c,
                                     const char *api_key_c,
                                     const char *model_c,

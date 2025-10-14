@@ -30,6 +30,7 @@ pub mod entities {
 
 pub mod ports {
     use crate::entities::{Completion, Prompt, TraceEvent};
+    use async_trait::async_trait;
 
     pub trait LlmProvider: Send + Sync {
         fn generate(&self, prompt: &Prompt) -> anyhow::Result<Completion>;
@@ -38,6 +39,12 @@ pub mod ports {
 
     pub trait TelemetrySink: Send + Sync {
         fn record(&self, event: TraceEvent);
+    }
+
+    #[async_trait]
+    pub trait LlmProviderAsync: Send + Sync {
+        async fn generate(&self, prompt: &Prompt) -> anyhow::Result<Completion>;
+        fn name(&self) -> &'static str { "unknown" }
     }
 
     pub trait MetricsSink: Send + Sync {

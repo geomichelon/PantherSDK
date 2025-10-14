@@ -66,9 +66,19 @@ public enum PantherSDK {
 
         public func validateWithProofRawJSON(prompt: String, guidelinesJSON: String? = nil) -> String {
             if let guidelinesJSON = guidelinesJSON {
-                // For custom guidelines, reuse run_multi and compute proof on Python side if needed.
-                // Here we call multi+proof only for default guidelines.
-                return validateRawJSON(prompt: prompt, guidelinesJSON: guidelinesJSON)
+                if let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "panther_validation_run_custom_with_proof") {
+                    typealias F = @convention(c) (UnsafePointer<CChar>, UnsafePointer<CChar>, UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
+                    let f = unsafeBitCast(sym, to: F.self)
+                    let p = prompt.cString(using: .utf8)!
+                    let j = providersJSON.cString(using: .utf8)!
+                    let g = guidelinesJSON.cString(using: .utf8)!
+                    guard let ptr = f(p, j, g) else { return "{\"error\":\"ffi call failed\"}" }
+                    let json = String(cString: ptr)
+                    panther_free_string(ptr)
+                    return json
+                } else {
+                    return validateRawJSON(prompt: prompt, guidelinesJSON: guidelinesJSON)
+                }
             } else {
                 guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "panther_validation_run_multi_with_proof") else {
                     return "{\"error\":\"validation_with_proof unavailable\"}"

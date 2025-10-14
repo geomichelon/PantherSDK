@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Depends, Header, HTTPException
 import sys
 import platform
+import sqlite3
+import threading
 from pydantic import BaseModel
 import json
 import os
@@ -139,6 +141,69 @@ _RUST = _load_rust_lib()
 
 
 _AUDIT: list[dict] = []
+_PROOF_HISTORY: list[dict] = []
+
+# SQLite persistence (Stage 3 — optional)
+_DB_PATH = os.getenv("PANTHER_SQLITE_PATH", os.path.abspath(os.path.join(os.getcwd(), "panther_proofs.db")))
+_DB: sqlite3.Connection | None = None
+_DB_LOCK = threading.Lock()
+
+# Prometheus metrics (Stage 3)
+try:
+    from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    _PROM_ENABLED = True
+    MET_ANCHOR_REQ = Counter('panther_anchor_requests_total', 'Total anchor requests')
+    MET_ANCHOR_OK = Counter('panther_anchor_success_total', 'Total successful anchor operations')
+    MET_ANCHOR_LAT = Histogram('panther_anchor_latency_seconds', 'Anchor latency (seconds)')
+    MET_STATUS_REQ = Counter('panther_status_checks_total', 'Total status check requests')
+except Exception:
+    _PROM_ENABLED = False
+
+
+def _init_db():
+    global _DB
+    try:
+        _DB = sqlite3.connect(_DB_PATH, check_same_thread=False)
+        _DB.execute(
+            """
+            CREATE TABLE IF NOT EXISTS proof_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                hash TEXT,
+                tx_hash TEXT,
+                anchored INTEGER,
+                explorer_url TEXT,
+                contract_url TEXT
+            )
+            """
+        )
+        _DB.execute("CREATE INDEX IF NOT EXISTS idx_proof_history_hash ON proof_history(hash)")
+        _DB.commit()
+    except Exception:
+        _DB = None
+
+
+def _db_insert_event(ev: dict):
+    if _DB is None:
+        return
+    try:
+        with _DB_LOCK:
+            _DB.execute(
+                "INSERT INTO proof_history(ts, action, hash, tx_hash, anchored, explorer_url, contract_url) VALUES(?,?,?,?,?,?,?)",
+                (
+                    int(ev.get("ts", 0)),
+                    str(ev.get("action", "")),
+                    ev.get("hash"),
+                    ev.get("tx_hash"),
+                    1 if ev.get("anchored") else 0 if ev.get("anchored") is not None else None,
+                    ev.get("explorer_url"),
+                    ev.get("contract_url"),
+                ),
+            )
+            _DB.commit()
+    except Exception:
+        pass
 
 
 def _auth_guard(x_api_key: str | None = Header(default=None)):
@@ -149,6 +214,8 @@ def _auth_guard(x_api_key: str | None = Header(default=None)):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="PantherSDK API")
+    # Initialize optional SQLite DB
+    _init_db()
 
     @app.get("/health")
     def health():
@@ -378,37 +445,140 @@ def create_app() -> FastAPI:
     # --- Proof anchoring (Stage 2) ---
     @app.post("/proof/anchor")
     def proof_anchor(body: dict, _auth=Depends(_auth_guard)):
+        import time as _t
+        if _PROM_ENABLED:
+            MET_ANCHOR_REQ.inc()
+        start = _t.time()
         h = body.get("hash") or body.get("combined_hash")
         if not h:
             return {"error": "missing 'hash' (combined_hash)"}
         rpc = os.getenv("PANTHER_ETH_RPC")
         ctr = os.getenv("PANTHER_PROOF_CONTRACT")
         key = os.getenv("PANTHER_ETH_PRIVKEY")
+        exp = os.getenv("PANTHER_EXPLORER_BASE")  # e.g., https://sepolia.etherscan.io
         if not (rpc and ctr and key):
             return {"error": "server not configured: set PANTHER_ETH_RPC, PANTHER_PROOF_CONTRACT, PANTHER_ETH_PRIVKEY"}
         if _RUST and hasattr(_RUST, "panther_proof_anchor_eth"):
             s = _RUST.panther_proof_anchor_eth(h.encode("utf-8"), rpc.encode("utf-8"), ctr.encode("utf-8"), key.encode("utf-8"))
             try:
                 data = ctypes.cast(s, c_char_p).value.decode("utf-8")
-                return json.loads(data)
+                out = json.loads(data)
+                tx = out.get("tx_hash")
+                if exp and isinstance(tx, str):
+                    out["explorer_url"] = f"{exp.rstrip('/')}/tx/{tx}"
+                # history event
+                try:
+                    _PROOF_HISTORY.append({
+                        "ts": int(__import__("time").time() * 1000),
+                        "action": "anchor",
+                        "hash": h,
+                        "tx_hash": tx,
+                        "explorer_url": out.get("explorer_url"),
+                    })
+                    if len(_PROOF_HISTORY) > 500:
+                        del _PROOF_HISTORY[: len(_PROOF_HISTORY) - 500]
+                    _db_insert_event({
+                        "ts": int(__import__("time").time() * 1000),
+                        "action": "anchor",
+                        "hash": h,
+                        "tx_hash": tx,
+                        "explorer_url": out.get("explorer_url"),
+                    })
+                except Exception:
+                    pass
+                return out
             finally:
                 _RUST.panther_free_string(s)
+        if _PROM_ENABLED:
+            MET_ANCHOR_LAT.observe(max(0.0, _t.time() - start))
         return {"error": "blockchain FFI unavailable"}
 
     @app.get("/proof/status")
     def proof_status(hash: str, _auth=Depends(_auth_guard)):
+        if _PROM_ENABLED:
+            MET_STATUS_REQ.inc()
         rpc = os.getenv("PANTHER_ETH_RPC")
         ctr = os.getenv("PANTHER_PROOF_CONTRACT")
+        exp = os.getenv("PANTHER_EXPLORER_BASE")
         if not (rpc and ctr):
             return {"error": "server not configured: set PANTHER_ETH_RPC, PANTHER_PROOF_CONTRACT"}
         if _RUST and hasattr(_RUST, "panther_proof_check_eth"):
             s = _RUST.panther_proof_check_eth(hash.encode("utf-8"), rpc.encode("utf-8"), ctr.encode("utf-8"))
             try:
                 data = ctypes.cast(s, c_char_p).value.decode("utf-8")
-                return json.loads(data)
+                out = json.loads(data)
+                if exp and isinstance(ctr, str):
+                    out["contract_url"] = f"{exp.rstrip('/')}/address/{ctr}"
+                # history event
+                try:
+                    _PROOF_HISTORY.append({
+                        "ts": int(__import__("time").time() * 1000),
+                        "action": "status",
+                        "hash": hash,
+                        "anchored": bool(out.get("anchored", False)),
+                        "contract_url": out.get("contract_url"),
+                    })
+                    if len(_PROOF_HISTORY) > 500:
+                        del _PROOF_HISTORY[: len(_PROOF_HISTORY) - 500]
+                    _db_insert_event({
+                        "ts": int(__import__("time").time() * 1000),
+                        "action": "status",
+                        "hash": hash,
+                        "anchored": bool(out.get("anchored", False)),
+                        "contract_url": out.get("contract_url"),
+                    })
+                except Exception:
+                    pass
+                return out
             finally:
                 _RUST.panther_free_string(s)
         return {"error": "blockchain FFI unavailable"}
+
+    @app.get("/metrics")
+    def metrics():
+        if not _PROM_ENABLED:
+            raise HTTPException(status_code=503, detail="prometheus not enabled")
+        data = generate_latest()  # type: ignore
+        from fastapi import Response
+        return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+
+    @app.get("/proof/history")
+    def proof_history(hash: str | None = None, limit: int = 100, _auth=Depends(_auth_guard)):
+        # Prefer DB if available
+        if _DB is not None:
+            try:
+                q = "SELECT ts, action, hash, tx_hash, anchored, explorer_url, contract_url FROM proof_history"
+                params: list = []
+                if hash:
+                    q += " WHERE hash = ?"
+                    params.append(hash)
+                q += " ORDER BY ts DESC LIMIT ?"
+                params.append(max(0, min(1000, limit)))
+                with _DB_LOCK:
+                    rows = list(_DB.execute(q, tuple(params)))
+                out = []
+                for ts, action, h, tx, an, ex, cu in rows:
+                    out.append({
+                        "ts": ts,
+                        "action": action,
+                        "hash": h,
+                        "tx_hash": tx,
+                        "anchored": bool(an) if an is not None else None,
+                        "explorer_url": ex,
+                        "contract_url": cu,
+                    })
+                return out
+            except Exception as e:
+                return {"error": str(e)}
+        # Fallback in-memory
+        try:
+            items = list(_PROOF_HISTORY)
+            if hash:
+                items = [e for e in items if e.get("hash") == hash]
+            items.sort(key=lambda e: e.get("ts", 0), reverse=True)
+            return items[: max(0, min(1000, limit))]
+        except Exception as e:
+            return {"error": str(e)}
 
     @app.post("/proof/verify")
     def proof_verify(body: dict, _auth=Depends(_auth_guard)):

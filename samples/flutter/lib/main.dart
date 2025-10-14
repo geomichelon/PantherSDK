@@ -20,6 +20,7 @@ class _MyAppState extends State<MyApp> {
   double bleu = 0;
   List<String> validationLines = [];
   String? proofHash;
+  String? anchorStatus;
 
   final List<Map<String, dynamic>> providerPresets = [
     {'label': 'OpenAI', 'type': 'openai', 'base': 'https://api.openai.com', 'model': 'gpt-4o-mini', 'requiresKey': true},
@@ -231,6 +232,11 @@ class _MyAppState extends State<MyApp> {
                   onPressed: _anchorProof,
                   child: const Text('Anchor Proof (API)'),
                 ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: _checkStatus,
+                  child: const Text('Check Status (API)'),
+                ),
               ],
               const SizedBox(height: 16),
               TextField(
@@ -252,6 +258,7 @@ class _MyAppState extends State<MyApp> {
               const SizedBox(height: 16),
               const Text('Validation:'),
               ...validationLines.map((line) => Text(line)).toList(),
+              if (anchorStatus != null) Text(anchorStatus!),
             ],
           ),
         ),
@@ -281,6 +288,29 @@ class _MyAppState extends State<MyApp> {
       });
     } catch (e) {
       setState(() { validationLines.add('Anchor error: $e'); });
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  void _checkStatus() async {
+    final hash = proofHash;
+    if (hash == null) return;
+    final base = apiBaseController.text.trim().isEmpty
+        ? (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000')
+        : apiBaseController.text.trim();
+    final client = HttpClient();
+    try {
+      final req = await client.getUrl(Uri.parse('$base/proof/status?hash=0x$hash'));
+      final k = apiKeyControllerApi.text.trim();
+      if (k.isNotEmpty) req.headers.set('X-API-Key', k);
+      final resp = await req.close();
+      final body = await resp.transform(utf8.decoder).join();
+      final obj = jsonDecode(body) as Map<String, dynamic>;
+      final anchored = obj['anchored'] as bool? ?? false;
+      setState(() { anchorStatus = 'Anchored: $anchored'; });
+    } catch (e) {
+      setState(() { anchorStatus = 'Status error: $e'; });
     } finally {
       client.close(force: true);
     }

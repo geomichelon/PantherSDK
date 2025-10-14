@@ -33,11 +33,11 @@ class PantherSDK private constructor(private val providersJson: String) {
     }
 
     fun validateAndGetProof(prompt: String, guidelinesJson: String? = null): Pair<List<String>, String?> {
-        if (guidelinesJson != null) {
-            val lines = validate(prompt, guidelinesJson)
-            return lines to null
+        val raw = if (guidelinesJson != null) {
+            PantherBridge.validateCustomWithProof(prompt, providersJson, guidelinesJson)
+        } else {
+            PantherBridge.validateMultiWithProof(prompt, providersJson)
         }
-        val raw = PantherBridge.validateMultiWithProof(prompt, providersJson)
         return try {
             val obj = org.json.JSONObject(raw)
             val arr = obj.getJSONArray("results")

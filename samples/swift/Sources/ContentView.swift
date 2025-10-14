@@ -7,6 +7,9 @@ struct ContentView: View {
     @State private var validation: [String] = []
     @State private var proofHash: String? = nil
     @State private var txHash: String? = nil
+    @State private var anchoredStatus: String? = nil
+    @State private var explorerURL: String? = nil
+    @State private var contractURL: String? = nil
 
     private struct ProviderPreset {
         let label: String
@@ -134,11 +137,24 @@ struct ContentView: View {
                                 .foregroundColor(.secondary)
                             Button("Anchor Proof (API)") { anchorProof(hash: proof) }
                                 .buttonStyle(.bordered)
+                            Button("Check Status (API)") { checkStatus(hash: proof) }
+                                .buttonStyle(.bordered)
+                            if let ex = explorerURL, let url = URL(string: ex) {
+                                Link("View on Explorer", destination: url)
+                            }
                         }
                         if let tx = txHash {
                             Text("Anchored tx: \(tx)")
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
+                        }
+                        if let st = anchoredStatus {
+                            Text(st)
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+                        if let cu = contractURL, let url = URL(string: cu) {
+                            Link("View Contract", destination: url)
                         }
                     }
                 }
@@ -220,7 +236,26 @@ struct ContentView: View {
             guard let data = data, err == nil,
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
             let tx = (obj["tx_hash"] as? String) ?? (obj["txHash"] as? String)
-            DispatchQueue.main.async { self.txHash = tx }
+            let ex = obj["explorer_url"] as? String
+            DispatchQueue.main.async { self.txHash = tx; self.explorerURL = ex }
+        }.resume()
+    }
+
+    private func checkStatus(hash: String) {
+        let base = apiBase.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var comps = URLComponents(string: (base.isEmpty ? "http://127.0.0.1:8000" : base) + "/proof/status") else { return }
+        comps.queryItems = [URLQueryItem(name: "hash", value: "0x" + hash)]
+        guard let url = comps.url else { return }
+        var req = URLRequest(url: url)
+        if !apiKeyHeader.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            req.setValue(apiKeyHeader, forHTTPHeaderField: "X-API-Key")
+        }
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            guard let data = data, err == nil,
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+            let an = (obj["anchored"] as? Bool) ?? false
+            let cu = obj["contract_url"] as? String
+            DispatchQueue.main.async { self.anchoredStatus = "Anchored: \(an ? "true" : "false")"; self.contractURL = cu }
         }.resume()
     }
 }

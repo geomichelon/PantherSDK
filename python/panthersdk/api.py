@@ -109,6 +109,21 @@ def _load_rust_lib():
                 except Exception:
                     pass
                 try:
+                    lib.panther_proof_anchor_eth.argtypes = [c_char_p, c_char_p, c_char_p, c_char_p]
+                    lib.panther_proof_anchor_eth.restype = c_char_p
+                except Exception:
+                    pass
+                try:
+                    lib.panther_proof_check_eth.argtypes = [c_char_p, c_char_p, c_char_p]
+                    lib.panther_proof_check_eth.restype = c_char_p
+                except Exception:
+                    pass
+                try:
+                    lib.panther_proof_verify_local.argtypes = [c_char_p, c_char_p, c_char_p, c_char_p, c_char_p, c_char_p]
+                    lib.panther_proof_verify_local.restype = ctypes.c_int
+                except Exception:
+                    pass
+                try:
                     lib.panther_version_string.restype = c_char_p
                 except Exception:
                     pass
@@ -359,5 +374,85 @@ def create_app() -> FastAPI:
     @app.get("/audit/logs")
     def audit_logs(_auth=Depends(_auth_guard)):
         return list(_AUDIT)
+
+    # --- Proof anchoring (Stage 2) ---
+    @app.post("/proof/anchor")
+    def proof_anchor(body: dict, _auth=Depends(_auth_guard)):
+        h = body.get("hash") or body.get("combined_hash")
+        if not h:
+            return {"error": "missing 'hash' (combined_hash)"}
+        rpc = os.getenv("PANTHER_ETH_RPC")
+        ctr = os.getenv("PANTHER_PROOF_CONTRACT")
+        key = os.getenv("PANTHER_ETH_PRIVKEY")
+        if not (rpc and ctr and key):
+            return {"error": "server not configured: set PANTHER_ETH_RPC, PANTHER_PROOF_CONTRACT, PANTHER_ETH_PRIVKEY"}
+        if _RUST and hasattr(_RUST, "panther_proof_anchor_eth"):
+            s = _RUST.panther_proof_anchor_eth(h.encode("utf-8"), rpc.encode("utf-8"), ctr.encode("utf-8"), key.encode("utf-8"))
+            try:
+                data = ctypes.cast(s, c_char_p).value.decode("utf-8")
+                return json.loads(data)
+            finally:
+                _RUST.panther_free_string(s)
+        return {"error": "blockchain FFI unavailable"}
+
+    @app.get("/proof/status")
+    def proof_status(hash: str, _auth=Depends(_auth_guard)):
+        rpc = os.getenv("PANTHER_ETH_RPC")
+        ctr = os.getenv("PANTHER_PROOF_CONTRACT")
+        if not (rpc and ctr):
+            return {"error": "server not configured: set PANTHER_ETH_RPC, PANTHER_PROOF_CONTRACT"}
+        if _RUST and hasattr(_RUST, "panther_proof_check_eth"):
+            s = _RUST.panther_proof_check_eth(hash.encode("utf-8"), rpc.encode("utf-8"), ctr.encode("utf-8"))
+            try:
+                data = ctypes.cast(s, c_char_p).value.decode("utf-8")
+                return json.loads(data)
+            finally:
+                _RUST.panther_free_string(s)
+        return {"error": "blockchain FFI unavailable"}
+
+    @app.post("/proof/verify")
+    def proof_verify(body: dict, _auth=Depends(_auth_guard)):
+        prompt = body.get("prompt", "")
+        providers = body.get("providers", [])
+        guidelines = body.get("guidelines_json")
+        results = body.get("results", [])
+        salt = body.get("salt")
+        proof = body.get("proof") or {}
+        if guidelines is None:
+            try:
+                repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+                path = os.path.join(repo_root, "crates", "panther-validation", "guidelines", "anvisa.json")
+                with open(path, "r", encoding="utf-8") as f:
+                    guidelines = json.dumps(json.load(f))
+            except Exception:
+                guidelines = "[]"
+        providers_json = json.dumps(providers)
+        results_json = json.dumps(results)
+        proof_json = json.dumps(proof)
+        if _RUST and hasattr(_RUST, "panther_proof_verify_local"):
+            ok = _RUST.panther_proof_verify_local(
+                prompt.encode("utf-8"),
+                providers_json.encode("utf-8"),
+                guidelines.encode("utf-8"),
+                results_json.encode("utf-8"),
+                (salt or "").encode("utf-8") if salt is not None else None,
+                proof_json.encode("utf-8"),
+            )
+            return {"valid": bool(ok)}
+        # Fallback: recompute proof and compare combined_hash
+        try:
+            def canon(obj):
+                return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            import hashlib
+            providers_hash = hashlib.sha3_512(canon(providers)).hexdigest()
+            gjson = json.loads(guidelines)
+            guidelines_hash = hashlib.sha3_512(canon(gjson)).hexdigest()
+            input_bundle = {"prompt": prompt, "providers": providers, "guidelines": gjson, "salt": salt}
+            input_hash = hashlib.sha3_512(canon(input_bundle)).hexdigest()
+            results_hash = hashlib.sha3_512(canon(results)).hexdigest()
+            combined = hashlib.sha3_512((input_hash + results_hash).encode("utf-8")).hexdigest()
+            return {"valid": (str(proof.get("combined_hash", "")).lower().replace("0x", "") == combined.lower())}
+        except Exception as e:
+            return {"error": str(e)}
 
     return app

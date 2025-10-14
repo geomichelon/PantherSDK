@@ -53,6 +53,14 @@ Compliance/Guidelines
 - [ ] Busca vetorial + similaridade
 - [ ] `trust_index` e `bias_score` avançados
 
+Blockchain / Verificação
+- [x] Stage 1: prova offline (`compute_proof`, `verify_proof_local`)
+- [x] Stage 1 FFI: `panther_validation_run_multi_with_proof`, `panther_proof_compute`, `panther_proof_verify_local`
+- [x] Stage 2 base: contrato `ProofRegistry` + FFI `panther_proof_anchor_eth`/`panther_proof_check_eth`
+- [x] API Python: `/proof/anchor` e `/proof/status`
+- [ ] Samples: botão “Anchor proof” via API (UI)
+- [ ] Automação de deploy do contrato (testnet) e link para explorer
+
 Observabilidade/Métricas
 - [x] `tracing` + sink de logs
 - [ ] Exportador Prometheus
@@ -150,4 +158,3 @@ Milestones Próximos
 Como Atualizar
 - Atualize status nas seções acima ao concluir entregas.
 - Mantenha `panther_features.yaml` como referência e sincronize este checklist quando necessário.
-

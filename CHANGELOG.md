@@ -1,5 +1,15 @@
 Changelog
 
+0.1.2 — Stage 2 (On‑chain anchoring) and UI buttons
+- Solidity contract `ProofRegistry` added at `docs/contracts/ProofRegistry.sol`.
+- Rust feature `blockchain-eth` with ethers‑rs client:
+  - FFI: `panther_proof_anchor_eth`, `panther_proof_check_eth`.
+- Python API endpoints:
+  - `POST /proof/anchor`, `GET /proof/status` (server‑side, env‑driven).
+- Samples:
+  - Swift/Kotlin/Flutter: botão “Anchor Proof (API)” que chama o backend e mostra `tx_hash`.
+  - React Native: helper `anchorProof(hash, apiBase?, apiKey?)` em `Panther.ts`.
+
 0.1.1 — Stage 1 (Offline Proofs) and Packaging
 - Added proof module (Stage 1) with SHA3-512 hashing and canonical JSON:
   - `compute_proof`, `verify_proof_local` in `crates/panther-validation`.

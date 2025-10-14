@@ -90,6 +90,18 @@ Docker Compose (optional)
   - `curl -s http://localhost:8000/health | jq`
   - Se `PANTHER_API_KEY` estiver definido, adicione `-H 'X-API-Key: $PANTHER_API_KEY'`.
 
+Blockchain Anchoring (Stage 2)
+- Contract: docs/contracts/ProofRegistry.sol
+- Server env (API):
+  - `PANTHER_ETH_RPC` — RPC URL (e.g., https://sepolia.infura.io/v3/…)
+  - `PANTHER_PROOF_CONTRACT` — deployed ProofRegistry address
+  - `PANTHER_ETH_PRIVKEY` — private key (use only on secure server)
+- Endpoints:
+  - `POST /proof/anchor` with `{ "hash": "0x…" }` → `{ "tx_hash": "0x…" }`
+  - `GET /proof/status?hash=0x…` → `{ "anchored": true|false }`
+- Build FFI with blockchain (optional):
+  - `cargo build -p panther-ffi --features "validation blockchain-eth" --release`
+
 See `docs/ARCHITECTURE.md` for detailed layers and flows.
 
 White‑Label Validation
@@ -103,9 +115,9 @@ White‑Label Validation
 
 Samples (quick tour)
 - iOS (Swift): `PantherSDK.make(llms:)` then `validate(prompt:)`; the UI lets you input URL/key/model for any provider.
-- Android (Kotlin): `PantherSDK.make(listOf(LLM(...)))` then `validate(prompt)`; fields in the sample build providers JSON.
-- Flutter: builds providers JSON and calls `validateMulti(prompt, providersJson)` via Dart FFI.
-- React Native: native module exposes `validateMulti(prompt, providersJson)` (see sample’s `Panther.ts`).
+- Android (Kotlin): `PantherSDK.make(listOf(LLM(...)))` then `validate(prompt)`; fields in the sample build providers JSON. Includes UI to configure Backend API and “Anchor Proof (API)”.
+- Flutter: builds providers JSON and calls `validateMultiWithProof(prompt, providersJson)` via Dart FFI. Includes “Anchor Proof (API)”.
+- React Native: native module exposes `validateMultiWithProof(...)` and helper `anchorProof(...)`. Example screen: `samples/react_native/AppSample.tsx`.
 
 Features and Adapters
 - Core remains independent of adapters; it depends only on domain ports.

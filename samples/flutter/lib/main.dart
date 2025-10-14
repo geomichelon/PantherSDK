@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'ffi.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,6 +22,10 @@ class _MyAppState extends State<MyApp> {
   double bleu = 0;
   List<String> validationLines = [];
   String? proofHash;
+  String? explorerUrl;
+  String? contractUrl;
+  String? anchorStatus;
+  String? explorerUrl;
 
   final List<Map<String, dynamic>> providerPresets = [
     {'label': 'OpenAI', 'type': 'openai', 'base': 'https://api.openai.com', 'model': 'gpt-4o-mini', 'requiresKey': true},
@@ -231,6 +237,35 @@ class _MyAppState extends State<MyApp> {
                   onPressed: _anchorProof,
                   child: const Text('Anchor Proof (API)'),
                 ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: _checkStatus,
+                  child: const Text('Check Status (API)'),
+                ),
+                if (explorerUrl != null) ...[
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final url = Uri.parse(explorerUrl!);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    child: const Text('View on Explorer'),
+                  ),
+                ],
+                if (contractUrl != null) ...[
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final url = Uri.parse(contractUrl!);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    child: const Text('View Contract'),
+                  ),
+                ],
               ],
               const SizedBox(height: 16),
               TextField(
@@ -276,11 +311,40 @@ class _MyAppState extends State<MyApp> {
       final body = await resp.transform(utf8.decoder).join();
       final obj = jsonDecode(body) as Map<String, dynamic>;
       final tx = obj['tx_hash'] as String?;
+      final ex = obj['explorer_url'] as String?;
       setState(() {
         validationLines.add(tx != null ? 'Anchored tx: $tx' : 'Anchor failed');
+        explorerUrl = ex;
       });
     } catch (e) {
       setState(() { validationLines.add('Anchor error: $e'); });
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  void _checkStatus() async {
+    final hash = proofHash;
+    if (hash == null) return;
+    final base = apiBaseController.text.trim().isEmpty
+        ? (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000')
+        : apiBaseController.text.trim();
+    final client = HttpClient();
+    try {
+      final req = await client.getUrl(Uri.parse('$base/proof/status?hash=0x$hash'));
+      final k = apiKeyControllerApi.text.trim();
+      if (k.isNotEmpty) req.headers.set('X-API-Key', k);
+      final resp = await req.close();
+      final body = await resp.transform(utf8.decoder).join();
+      final obj = jsonDecode(body) as Map<String, dynamic>;
+      final anchored = (obj['anchored'] as bool?) ?? false;
+      final cu = obj['contract_url'] as String?;
+      setState(() {
+        anchorStatus = 'Anchored: ${anchored ? 'true' : 'false'}';
+        contractUrl = cu;
+      });
+    } catch (e) {
+      setState(() { anchorStatus = 'Status error: $e'; });
     } finally {
       client.close(force: true);
     }

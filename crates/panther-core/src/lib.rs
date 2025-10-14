@@ -1,10 +1,11 @@
 use panther_domain::entities::{Completion, Prompt};
-use panther_domain::ports::{KeyValueStore, LlmProvider, MetricsSink, TelemetrySink};
+use panther_domain::ports::{KeyValueStore, LlmProvider, LlmProviderAsync, MetricsSink, TelemetrySink};
 use std::sync::Arc;
 use tracing::info;
 
 pub struct Engine {
     provider: Arc<dyn LlmProvider>,
+    provider_async: Option<Arc<dyn LlmProviderAsync>>,
     telemetry: Option<Arc<dyn TelemetrySink>>, 
     metrics: Option<Arc<dyn MetricsSink>>,
     storage: Option<Arc<dyn KeyValueStore>>,
@@ -12,7 +13,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(provider: Arc<dyn LlmProvider>, telemetry: Option<Arc<dyn TelemetrySink>>) -> Self {
-        Self { provider, telemetry, metrics: None, storage: None }
+        Self { provider, provider_async: None, telemetry, metrics: None, storage: None }
     }
 
     pub fn with_metrics(mut self, metrics: Arc<dyn MetricsSink>) -> Self {
@@ -22,6 +23,11 @@ impl Engine {
 
     pub fn with_storage(mut self, storage: Arc<dyn KeyValueStore>) -> Self {
         self.storage = Some(storage);
+        self
+    }
+
+    pub fn with_async_provider(mut self, provider: Arc<dyn LlmProviderAsync>) -> Self {
+        self.provider_async = Some(provider);
         self
     }
 
@@ -70,8 +76,50 @@ impl Engine {
     }
 
     pub async fn generate_async(&self, prompt: Prompt) -> anyhow::Result<Completion> {
-        // Synchronous core for now; async-friendly signature for callers.
-        self.generate(prompt)
+        if let Some(p) = &self.provider_async {
+            let start_ms = chrono::Utc::now().timestamp_millis();
+            if let Some(m) = &self.metrics { m.inc_counter("panther.generate.calls", 1.0); }
+            let result = p.generate(&prompt).await;
+            let end_ms = chrono::Utc::now().timestamp_millis();
+
+            if let Some(sink) = &self.telemetry {
+                if let Ok(c) = &result {
+                    let evt = panther_domain::entities::TraceEvent {
+                        name: "completion".into(),
+                        message: c.text.clone(),
+                        timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                        attributes: serde_json::json!({"model": c.model}),
+                    };
+                    sink.record(evt);
+                }
+            }
+            if let Ok(c) = &result {
+                let latency_ms = (end_ms - start_ms).max(0) as f64;
+                let input_tokens = token_count(&prompt.text) as f64;
+                let output_tokens = token_count(&c.text) as f64;
+                let total_tokens = input_tokens + output_tokens;
+
+                if let Some(m) = &self.metrics {
+                    m.observe_histogram("panther.latency_ms", latency_ms);
+                    m.observe_histogram("panther.tokens.input", input_tokens);
+                    m.observe_histogram("panther.tokens.output", output_tokens);
+                    m.observe_histogram("panther.tokens.total", total_tokens);
+                }
+
+                if let Some(store) = &self.storage {
+                    let _ = store.set("panther.last_model", c.model.clone().unwrap_or_default());
+                    let _ = save_metric(store.as_ref(), "panther.latency_ms", latency_ms, end_ms);
+                    let _ = save_metric(store.as_ref(), "panther.tokens.input", input_tokens, end_ms);
+                    let _ = save_metric(store.as_ref(), "panther.tokens.output", output_tokens, end_ms);
+                    let _ = save_metric(store.as_ref(), "panther.tokens.total", total_tokens, end_ms);
+                }
+            }
+            result
+        } else {
+            // Fallback: run blocking provider on a blocking thread
+            let this = self;
+            tokio::task::spawn_blocking(move || this.generate(prompt)).await.unwrap_or_else(|e| Err(anyhow::anyhow!("join error: {}", e)))
+        }
     }
 
     pub fn record_metric(&self, name: &str, value: f64) {

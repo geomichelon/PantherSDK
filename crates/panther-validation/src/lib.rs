@@ -72,14 +72,19 @@ impl LLMValidator {
                             raw_text: c.text,
                         })
                     }
-                    Err(e) => Ok::<ValidationResult, anyhow::Error>(ValidationResult {
-                        provider_name: label,
-                        adherence_score: 0.0,
-                        missing_terms: expected_terms,
-                        latency_ms: end - start,
-                        cost: None,
-                        raw_text: format!("error: {}", e),
-                    }),
+                    Err(e) => {
+                        let msg = e.to_string();
+                        let cat = classify_error(&msg);
+                        let raw = serde_json::json!({"error": {"category": cat, "message": msg}}).to_string();
+                        Ok::<ValidationResult, anyhow::Error>(ValidationResult {
+                            provider_name: label,
+                            adherence_score: 0.0,
+                            missing_terms: expected_terms,
+                            latency_ms: end - start,
+                            cost: None,
+                            raw_text: raw,
+                        })
+                    }
                 }
             }));
         }
@@ -145,6 +150,120 @@ impl ProviderFactory {
         {
             Err(anyhow::anyhow!("ollama feature not enabled"))
         }
+    }
+}
+
+pub struct ProviderFactoryAsync;
+
+impl ProviderFactoryAsync {
+    pub fn openai_from_env() -> Result<(String, Arc<dyn panther_domain::ports::LlmProviderAsync>)> {
+        #[cfg(feature = "openai-async")]
+        {
+            let api_key = std::env::var("PANTHER_OPENAI_API_KEY")?;
+            let model = std::env::var("PANTHER_OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string());
+            let base = std::env::var("PANTHER_OPENAI_BASE").unwrap_or_else(|_| "https://api.openai.com".to_string());
+            let p = panther_providers::openai_async::OpenAiProviderAsync { api_key, model: model.clone(), base_url: base, timeout_secs: 30, retries: 2 };
+            Ok((format!("openai:{}", model), Arc::new(p)))
+        }
+        #[cfg(not(feature = "openai-async"))]
+        {
+            Err(anyhow::anyhow!("openai-async feature not enabled"))
+        }
+    }
+
+    pub fn ollama_from_env() -> Result<(String, Arc<dyn panther_domain::ports::LlmProviderAsync>)> {
+        #[cfg(feature = "ollama-async")]
+        {
+            let base = std::env::var("PANTHER_OLLAMA_BASE").unwrap_or_else(|_| "http://localhost:11434".to_string());
+            let model = std::env::var("PANTHER_OLLAMA_MODEL").unwrap_or_else(|_| "llama3".to_string());
+            let p = panther_providers::ollama_async::OllamaProviderAsync { base_url: base, model: model.clone(), timeout_secs: 30, retries: 2 };
+            Ok((format!("ollama:{}", model), Arc::new(p)))
+        }
+        #[cfg(not(feature = "ollama-async"))]
+        {
+            Err(anyhow::anyhow!("ollama-async feature not enabled"))
+        }
+    }
+}
+
+pub struct LLMValidatorAsync {
+    guidelines: Vec<Guideline>,
+    providers: Vec<(String, Arc<dyn panther_domain::ports::LlmProviderAsync>)>,
+}
+
+impl LLMValidatorAsync {
+    pub fn from_json_str(json: &str, providers: Vec<(String, Arc<dyn panther_domain::ports::LlmProviderAsync>)>) -> Result<Self> {
+        let guidelines: Vec<Guideline> = serde_json::from_str(json)?;
+        Ok(Self { guidelines, providers })
+    }
+
+    pub async fn validate(&self, input_prompt: &str) -> Result<Vec<ValidationResult>> {
+        use futures::future::join_all;
+        let expected: Vec<String> = self
+            .guidelines
+            .iter()
+            .flat_map(|g| g.expected_terms.iter().cloned())
+            .collect();
+        let prompt = Prompt { text: input_prompt.to_string() };
+        let mut futs = Vec::new();
+        for (label, prov) in &self.providers {
+            let label = label.clone();
+            let prov = prov.clone();
+            let expected_terms = expected.clone();
+            let prompt = prompt.clone();
+            futs.push(async move {
+                let start = now_ms();
+                let res = prov.generate(&prompt).await;
+                let end = now_ms();
+                match res {
+                    Ok(c) => {
+                        let (score, missing) = score_text(&c.text, &expected_terms);
+                        Ok::<ValidationResult, anyhow::Error>(ValidationResult {
+                            provider_name: label,
+                            adherence_score: score,
+                            missing_terms: missing,
+                            latency_ms: end - start,
+                            cost: None,
+                            raw_text: c.text,
+                        })
+                    }
+                    Err(e) => {
+                        let msg = e.to_string();
+                        let cat = classify_error(&msg);
+                        let raw = serde_json::json!({"error": {"category": cat, "message": msg}}).to_string();
+                        Ok::<ValidationResult, anyhow::Error>(ValidationResult {
+                            provider_name: label,
+                            adherence_score: 0.0,
+                            missing_terms: expected_terms,
+                            latency_ms: end - start,
+                            cost: None,
+                            raw_text: raw,
+                        })
+                    }
+                }
+            });
+        }
+        let mut results = Vec::new();
+        for r in join_all(futs).await { if let Ok(v) = r { results.push(v) } }
+        results.sort_by(|a, b| b.adherence_score.partial_cmp(&a.adherence_score).unwrap_or(std::cmp::Ordering::Equal));
+        Ok(results)
+    }
+}
+
+fn classify_error(msg: &str) -> &'static str {
+    let m = msg.to_ascii_lowercase();
+    if m.starts_with("timeout:") || m.contains("timeout") {
+        "timeout"
+    } else if m.starts_with("rate_limit:") || m.contains("429") {
+        "rate_limit"
+    } else if m.starts_with("invalid_request:") || m.contains("400") || m.contains("422") {
+        "invalid_request"
+    } else if m.starts_with("upstream_error:") || m.contains("5xx") || m.contains("500") {
+        "upstream_error"
+    } else if m.contains("network_error") {
+        "network_error"
+    } else {
+        "unknown"
     }
 }
 

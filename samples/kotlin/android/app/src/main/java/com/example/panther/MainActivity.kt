@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     )
 
     private val prefs by lazy { getSharedPreferences("panther-sdk", MODE_PRIVATE) }
+    private var lastProof: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +62,10 @@ class MainActivity : AppCompatActivity() {
         val btnSaveGuidelines = Button(this).apply { text = "Save Guidelines" }
 
         val btnValidate = Button(this).apply { text = "Validate" }
+        // Backend API config
+        val backendBaseInput = EditText(this).apply { hint = "API Base (e.g. http://10.0.2.2:8000)" }
+        val backendKeyInput = EditText(this).apply { hint = "API Key (X-API-Key, optional)" }
+        val btnAnchor = Button(this).apply { text = "Anchor Proof" }
         val outputView = TextView(this)
 
         var currentPreset = presets.first()
@@ -116,12 +121,19 @@ class MainActivity : AppCompatActivity() {
             addView(guidelineInput)
             addView(btnSaveGuidelines)
             addView(guidelineStatus)
+            addView(TextView(this@MainActivity).apply { text = "Backend API" })
+            addView(backendBaseInput)
+            addView(backendKeyInput)
             addView(btnValidate)
+            addView(btnAnchor)
             addView(outputView)
         }
         setContentView(layout)
 
         PantherBridge.pantherInit()
+        // Load backend prefs
+        backendBaseInput.setText(prefs.getString("api.base", if (android.os.Build.FINGERPRINT.contains("generic")) "http://10.0.2.2:8000" else "http://127.0.0.1:8000"))
+        backendKeyInput.setText(prefs.getString("api.key", ""))
 
         btnRecord.setOnClickListener { PantherBridge.recordMetric("button_press") }
         btnList.setOnClickListener { outputView.text = PantherBridge.listStorageItems() }
@@ -159,8 +171,46 @@ class MainActivity : AppCompatActivity() {
             buf.append(lines.joinToString("\n"))
             if (proof != null) {
                 buf.append("\nProof: ").append(proof)
+                lastProof = proof
+            } else {
+                lastProof = null
             }
             outputView.text = buf.toString()
+        }
+
+        btnAnchor.setOnClickListener {
+            val proof = lastProof
+            if (proof == null) {
+                outputView.text = outputView.text.toString() + "\nNo proof to anchor."
+                return@setOnClickListener
+            }
+            Thread {
+                try {
+                    val base = backendBaseInput.text.toString().trim().ifBlank { if (android.os.Build.FINGERPRINT.contains("generic")) "http://10.0.2.2:8000" else "http://127.0.0.1:8000" }
+                    val url = java.net.URL("$base/proof/anchor")
+                    val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        setRequestProperty("Content-Type", "application/json")
+                        val key = backendKeyInput.text.toString().trim()
+                        if (key.isNotEmpty()) setRequestProperty("X-API-Key", key)
+                        doOutput = true
+                    }
+                    val payload = "{" + "\"hash\":\"0x$proof\"" + "}"
+                    conn.outputStream.use { it.write(payload.toByteArray()) }
+                    val res = conn.inputStream.bufferedReader().use { it.readText() }
+                    val obj = org.json.JSONObject(res)
+                    val tx = obj.optString("tx_hash", null)
+                    runOnUiThread {
+                        outputView.text = outputView.text.toString() + (if (tx != null) "\nAnchored tx: $tx" else "\nAnchor failed")
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        outputView.text = outputView.text.toString() + "\nAnchor error: ${e.message}"
+                    }
+                }
+            }.start()
+            // Save backend prefs
+            prefs.edit().putString("api.base", backendBaseInput.text.toString().trim()).putString("api.key", backendKeyInput.text.toString().trim()).apply()
         }
     }
 

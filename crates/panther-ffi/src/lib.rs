@@ -391,6 +391,53 @@ pub extern "C" fn panther_proof_verify_local(
     }
     0
 }
+
+// ---------- Blockchain (optional) ----------
+#[cfg(feature = "blockchain-eth")]
+#[no_mangle]
+pub extern "C" fn panther_proof_anchor_eth(
+    proof_hash_hex_c: *const c_char,
+    rpc_url_c: *const c_char,
+    contract_addr_c: *const c_char,
+    privkey_c: *const c_char,
+) -> *mut std::os::raw::c_char {
+    let proof_hash_hex = unsafe { CStr::from_ptr(proof_hash_hex_c).to_string_lossy().into_owned() };
+    let rpc_url = unsafe { CStr::from_ptr(rpc_url_c).to_string_lossy().into_owned() };
+    let contract_addr = unsafe { CStr::from_ptr(contract_addr_c).to_string_lossy().into_owned() };
+    let privkey = unsafe { CStr::from_ptr(privkey_c).to_string_lossy().into_owned() };
+
+    let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        Ok(r) => r,
+        Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
+    };
+    let res = rt.block_on(async move {
+        let result = panther_validation::anchor_eth::anchor_proof(&proof_hash_hex, &rpc_url, &contract_addr, &privkey).await?;
+        Ok::<String, anyhow::Error>(serde_json::to_string(&result)? )
+    });
+    match res { Ok(s) => rust_string_to_c(s), Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)), }
+}
+
+#[cfg(feature = "blockchain-eth")]
+#[no_mangle]
+pub extern "C" fn panther_proof_check_eth(
+    proof_hash_hex_c: *const c_char,
+    rpc_url_c: *const c_char,
+    contract_addr_c: *const c_char,
+) -> *mut std::os::raw::c_char {
+    let proof_hash_hex = unsafe { CStr::from_ptr(proof_hash_hex_c).to_string_lossy().into_owned() };
+    let rpc_url = unsafe { CStr::from_ptr(rpc_url_c).to_string_lossy().into_owned() };
+    let contract_addr = unsafe { CStr::from_ptr(contract_addr_c).to_string_lossy().into_owned() };
+
+    let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        Ok(r) => r,
+        Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
+    };
+    let res = rt.block_on(async move {
+        let anchored = panther_validation::anchor_eth::is_anchored(&proof_hash_hex, &rpc_url, &contract_addr).await?;
+        Ok::<String, anyhow::Error>(serde_json::to_string(&serde_json::json!({"anchored": anchored}))? )
+    });
+    match res { Ok(s) => rust_string_to_c(s), Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)), }
+}
 #[cfg(feature = "validation")]
 #[no_mangle]
 pub extern "C" fn panther_validation_run_openai(

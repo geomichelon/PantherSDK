@@ -1,4 +1,4 @@
-import {NativeModules} from 'react-native';
+import {NativeModules, Platform} from 'react-native';
 
 type PantherModuleType = {
   init(): Promise<number>;
@@ -53,4 +53,17 @@ export async function version(): Promise<string> {
 
 export async function validateMultiWithProof(prompt: string, providersJson: string): Promise<string> {
   return PantherModule.validateMultiWithProof(prompt, providersJson);
+}
+
+export async function anchorProof(hash: string, apiBase?: string, apiKey?: string): Promise<{tx_hash?: string; error?: string}> {
+  const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+  const res = await fetch(`${base}/proof/anchor`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    },
+    body: JSON.stringify({hash: `0x${hash}`}),
+  });
+  return res.json();
 }

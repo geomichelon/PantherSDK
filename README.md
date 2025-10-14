@@ -38,6 +38,58 @@ Python API Layer
 - Integrates with the core via PyO3 module (preferred) or FFI fallback
 - Suitable for governance, dashboards, and enterprise systems
 
+Python API Quickstart
+- Build the Rust FFI (with validation features) locally:
+  - macOS: `cargo build -p panther-ffi --features "metrics-inmemory storage-inmemory validation validation-openai validation-ollama"`
+  - Linux: `cargo build -p panther-ffi --features "metrics-inmemory storage-inmemory validation validation-openai validation-ollama" --release`
+- Run the API:
+  - From `python/`: `uvicorn panthersdk.api:create_app --host 0.0.0.0 --port 8000`
+- Optional API key: set `PANTHER_API_KEY=secret` and pass header `X-API-Key: secret` in requests.
+
+Curl examples
+- Health:
+  - `curl -s http://localhost:8000/health | jq`
+- Default guidelines (ANVISA):
+  - `curl -s -H 'X-API-Key: secret' http://localhost:8000/guidelines/default | jq`
+- Validation multi-provider (OpenAI-compatible + Ollama):
+  - `curl -s -X POST \
+     -H 'Content-Type: application/json' \
+     -H 'X-API-Key: secret' \
+     -d '{
+           "prompt": "Explique recomendações seguras de medicamentos na gravidez.",
+           "providers": [
+             {"type":"openai","api_key":"sk-...","base_url":"https://api.openai.com","model":"gpt-4o-mini"},
+             {"type":"ollama","base_url":"http://127.0.0.1:11434","model":"llama3"}
+           ]
+         }' \
+     http://localhost:8000/validation/run_multi | jq`
+
+- Proof compute (Stage 1, offline):
+  - Primeiro execute uma validação (como acima) e capture `results` (array JSON).
+  - `curl -s -X POST \
+     -H 'Content-Type: application/json' \
+     -H 'X-API-Key: secret' \
+     -d '{
+           "prompt": "Explique recomendações seguras de medicamentos na gravidez.",
+           "providers": [
+             {"type":"openai","api_key":"sk-...","base_url":"https://api.openai.com","model":"gpt-4o-mini"},
+             {"type":"ollama","base_url":"http://127.0.0.1:11434","model":"llama3"}
+           ],
+           "results": [/* cole aqui o array results */],
+           "salt": null
+         }' \
+     http://localhost:8000/proof/compute | jq`
+  - Resposta: objeto `proof` com `input_hash`, `results_hash` e `combined_hash`.
+
+Docker Compose (optional)
+- Build Linux shared lib in a Rust container (outputs to `target/release`):
+  - `docker compose run --rm ffi-build`
+- Start the API (mounts repo; loads FFI `.so` if present):
+  - `docker compose up api`
+- Test:
+  - `curl -s http://localhost:8000/health | jq`
+  - Se `PANTHER_API_KEY` estiver definido, adicione `-H 'X-API-Key: $PANTHER_API_KEY'`.
+
 See `docs/ARCHITECTURE.md` for detailed layers and flows.
 
 White‑Label Validation
@@ -66,6 +118,23 @@ Build Tools
 - Rust: `cargo`
 - Python extension: `maturin` (builds `pantherpy` from `crates/panther-py`)
 - WebAssembly: `wasm-bindgen` (via `wasm-pack` or direct)
+
+Packaging Scripts
+- Orquestração: `scripts/release/all.sh` (usa versão do workspace e `dist/<version>`)
+- iOS: `scripts/release/build_ios_xcframework.sh` → `PantherSDK.xcframework`
+- Android: `scripts/release/build_android_aar.sh` → `panther-ffi-<version>.aar`
+- Python: `scripts/release/build_python_wheel.sh` → wheels em `dist/<version>/python`
+- WASM: `scripts/release/build_wasm_pkg.sh` → pacote npm em `dist/<version>/npm`
+- Headers: `scripts/release/package_headers.sh` → `include/panther.h` e `c-headers-<version>.zip`
+- Checksums/Manifest: `scripts/release/checksum_and_manifest.sh` → `SHA256SUMS` e `manifest.json`
+
+Exemplo de uso (local)
+```
+FEATURES="metrics-inmemory storage-inmemory validation validation-openai validation-ollama" \
+  VERSION=$(awk '/^\[workspace.package\]/{f=1;next} f && /version/{gsub(/\"/,"",$0); sub(/version *= */,"",$0); print $0; exit}' Cargo.toml | tr -d ' ') \
+  bash scripts/release/all.sh
+```
+Saída em `dist/<version>/...` com `manifest.json` e `SHA256SUMS`.
 
 Async Runtime & Logging
 - Async runtime: `tokio`

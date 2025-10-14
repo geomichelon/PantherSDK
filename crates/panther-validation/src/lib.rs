@@ -147,3 +147,139 @@ impl ProviderFactory {
         }
     }
 }
+
+// ---- Proofs (Stage 1: offline) ----
+pub mod proof {
+    use super::*;
+    use sha3::{Digest, Sha3_512};
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ProofContext {
+        pub sdk_version: String,
+        pub salt: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Proof {
+        pub scheme: String,          // e.g., "panther-proof-v1"
+        pub input_hash: String,      // hex(sha3_512(canonical(prompt, providers, guidelines, salt?)))
+        pub results_hash: String,    // hex(sha3_512(canonical(results)))
+        pub combined_hash: String,   // hex(sha3_512(input_hash || results_hash))
+        pub guidelines_hash: String, // hex(sha3_512(canonical(guidelines)))
+        pub providers_hash: String,  // hex(sha3_512(canonical(providers)))
+        pub timestamp_ms: i64,
+        pub sdk_version: String,
+        pub salt_present: bool,
+    }
+
+    fn canonicalize(value: &serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut entries: Vec<_> = map.iter().collect();
+                entries.sort_by(|a, b| a.0.cmp(b.0));
+                let mut new = serde_json::Map::new();
+                for (k, v) in entries {
+                    new.insert(k.clone(), canonicalize(v));
+                }
+                serde_json::Value::Object(new)
+            }
+            serde_json::Value::Array(arr) => {
+                let v = arr.iter().map(canonicalize).collect::<Vec<_>>();
+                serde_json::Value::Array(v)
+            }
+            _ => value.clone(),
+        }
+    }
+
+    fn hash_json(value: &serde_json::Value) -> String {
+        let canon = canonicalize(value);
+        let bytes = serde_json::to_vec(&canon).unwrap_or_default();
+        let mut hasher = Sha3_512::new();
+        hasher.update(&bytes);
+        let out = hasher.finalize();
+        hex::encode(out)
+    }
+
+    fn hash_concat_hex(a_hex: &str, b_hex: &str) -> String {
+        let mut hasher = Sha3_512::new();
+        hasher.update(a_hex.as_bytes());
+        hasher.update(b_hex.as_bytes());
+        let out = hasher.finalize();
+        hex::encode(out)
+    }
+
+    pub fn compute_proof(
+        prompt: &str,
+        providers_json: &str,
+        guidelines_json: &str,
+        results_json: &str,
+        ctx: &ProofContext,
+    ) -> anyhow::Result<Proof> {
+        let providers_val: serde_json::Value = serde_json::from_str(providers_json).unwrap_or(serde_json::Value::Null);
+        let guidelines_val: serde_json::Value = serde_json::from_str(guidelines_json).unwrap_or(serde_json::Value::Null);
+        let results_val: serde_json::Value = serde_json::from_str(results_json).unwrap_or(serde_json::Value::Null);
+
+        let providers_hash = hash_json(&providers_val);
+        let guidelines_hash = hash_json(&guidelines_val);
+        let results_hash = hash_json(&results_val);
+
+        // input bundle: prompt + providers + guidelines + optional salt
+        let input_bundle = serde_json::json!({
+            "prompt": prompt,
+            "providers": providers_val,
+            "guidelines": guidelines_val,
+            "salt": ctx.salt,
+        });
+        let input_hash = hash_json(&input_bundle);
+        let combined_hash = hash_concat_hex(&input_hash, &results_hash);
+        let proof = Proof {
+            scheme: "panther-proof-v1".to_string(),
+            input_hash,
+            results_hash,
+            combined_hash,
+            guidelines_hash,
+            providers_hash,
+            timestamp_ms: now_ms(),
+            sdk_version: ctx.sdk_version.clone(),
+            salt_present: ctx.salt.is_some(),
+        };
+        Ok(proof)
+    }
+
+    pub fn verify_proof_local(
+        expected: &Proof,
+        prompt: &str,
+        providers_json: &str,
+        guidelines_json: &str,
+        results_json: &str,
+        salt: Option<String>,
+    ) -> bool {
+        let ctx = ProofContext { sdk_version: expected.sdk_version.clone(), salt };
+        if let Ok(p) = compute_proof(prompt, providers_json, guidelines_json, results_json, &ctx) {
+            p.combined_hash == expected.combined_hash
+        } else {
+            false
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn proof_determinism_and_verify() {
+            let prompt = "hello";
+            let providers = "[{\"type\":\"ollama\",\"base_url\":\"http://localhost:11434\",\"model\":\"llama3\"}]";
+            let guidelines = "[]";
+            let results = "[]";
+            let ctx = ProofContext { sdk_version: "test".into(), salt: Some("s1".into()) };
+
+            let p1 = compute_proof(prompt, providers, guidelines, results, &ctx).unwrap();
+            let p2 = compute_proof(prompt, providers, guidelines, results, &ctx).unwrap();
+            assert_eq!(p1.combined_hash, p2.combined_hash);
+
+            assert!(verify_proof_local(&p1, prompt, providers, guidelines, results, Some("s1".into())));
+            assert!(!verify_proof_local(&p1, prompt, providers, guidelines, results, Some("different".into())));
+        }
+    }
+}

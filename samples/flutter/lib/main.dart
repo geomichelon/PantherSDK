@@ -104,17 +104,22 @@ class _MyAppState extends State<MyApp> {
       });
     }
 
-    final raw = panther.validateMulti(prompt, jsonEncode(providers));
+    final raw = panther.validateMultiWithProof(prompt, jsonEncode(providers));
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is List) {
+      if (decoded is Map && decoded.containsKey('results')) {
+        final results = decoded['results'] as List<dynamic>;
         setState(() {
-          validationLines = decoded.map((entry) {
+          validationLines = results.map((entry) {
             final name = entry['provider_name'] ?? '?';
             final score = (entry['adherence_score'] ?? 0).toDouble();
             final latency = entry['latency_ms'] ?? 0;
             return '$name – ${score.toStringAsFixed(1)}% – $latency ms';
           }).cast<String>().toList();
+          final proof = decoded['proof'] as Map<String, dynamic>?;
+          if (proof != null && proof['combined_hash'] is String) {
+            validationLines.add('Proof: ${proof['combined_hash']}');
+          }
         });
         return;
       }

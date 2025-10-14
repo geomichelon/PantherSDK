@@ -154,8 +154,13 @@ class MainActivity : AppCompatActivity() {
             }
             val sdk = PantherSDK.make(llms)
             val guidelines = if (guidelineToggle.isChecked) guidelineInput.text.toString() else null
-            val lines = sdk.validate(prompt.text.toString(), guidelines)
-            outputView.text = lines.joinToString("\n")
+            val (lines, proof) = sdk.validateAndGetProof(prompt.text.toString(), guidelines)
+            val buf = StringBuilder()
+            buf.append(lines.joinToString("\n"))
+            if (proof != null) {
+                buf.append("\nProof: ").append(proof)
+            }
+            outputView.text = buf.toString()
         }
     }
 

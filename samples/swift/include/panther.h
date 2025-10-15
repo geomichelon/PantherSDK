@@ -23,6 +23,10 @@ double panther_metrics_diversity(const char *samples_json);
 
 double panther_metrics_fluency(const char *text);
 
+double panther_metrics_rouge_l(const char *reference, const char *candidate);
+
+double panther_metrics_fact_coverage(const char *facts_json, const char *candidate);
+
 int32_t panther_metrics_record(const char *name, double value);
 
 char *panther_bias_detect(const char *samples_json);
@@ -41,19 +45,53 @@ char *panther_logs_get_recent(void);
 
 char *panther_version_string(void);
 
+char *panther_agent_run(const char *plan_json_c, const char *input_json_c);
+
+char *panther_agent_start(const char *plan_json_c, const char *input_json_c);
+
+char *panther_agent_poll(const char *run_id_c, const char *cursor_c);
+
+char *panther_agent_status(const char *run_id_c);
+
+char *panther_agent_result(const char *run_id_c);
+
 char *panther_generate(const char *prompt_c);
 
 void panther_free_string(char *s);
 
+char *panther_validation_run_custom_with_proof(const char *prompt_c,
+                                               const char *providers_json_c,
+                                               const char *guidelines_json_c);
+
 char *panther_validation_run_default(const char *prompt_c);
 
 char *panther_validation_run_multi_with_proof(const char *prompt_c, const char *providers_json_c);
+
+char *panther_validation_run_custom_with_proof(const char *prompt_c,
+                                               const char *providers_json_c,
+                                               const char *guidelines_json_c);
 
 char *panther_proof_compute(const char *prompt_c,
                             const char *providers_json_c,
                             const char *guidelines_json_c,
                             const char *results_json_c,
                             const char *salt_c);
+
+int32_t panther_proof_verify_local(const char *prompt_c,
+                                   const char *providers_json_c,
+                                   const char *guidelines_json_c,
+                                   const char *results_json_c,
+                                   const char *salt_c,
+                                   const char *proof_json_c);
+
+char *panther_proof_anchor_eth(const char *proof_hash_hex_c,
+                               const char *rpc_url_c,
+                               const char *contract_addr_c,
+                               const char *privkey_c);
+
+char *panther_proof_check_eth(const char *proof_hash_hex_c,
+                              const char *rpc_url_c,
+                              const char *contract_addr_c);
 
 char *panther_validation_run_openai(const char *prompt_c,
                                     const char *api_key_c,

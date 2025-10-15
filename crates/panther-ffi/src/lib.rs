@@ -105,6 +105,23 @@ pub extern "C" fn panther_metrics_fluency(text: *const c_char) -> f64 {
 }
 
 #[no_mangle]
+pub extern "C" fn panther_metrics_rouge_l(reference: *const c_char, candidate: *const c_char) -> f64 {
+    let r = unsafe { CStr::from_ptr(reference).to_string_lossy().into_owned() };
+    let c = unsafe { CStr::from_ptr(candidate).to_string_lossy().into_owned() };
+    if let Some(buf) = LOGS.get() { let _ = buf.lock().map(|mut v| v.push("metrics_rouge_l".to_string())); }
+    panthersdk::domain::metrics::evaluate_rouge_l(&r, &c)
+}
+
+#[no_mangle]
+pub extern "C" fn panther_metrics_fact_coverage(facts_json: *const c_char, candidate: *const c_char) -> f64 {
+    let facts_s = unsafe { CStr::from_ptr(facts_json).to_string_lossy().into_owned() };
+    let cand = unsafe { CStr::from_ptr(candidate).to_string_lossy().into_owned() };
+    let facts: Vec<String> = serde_json::from_str(&facts_s).unwrap_or_default();
+    if let Some(buf) = LOGS.get() { let _ = buf.lock().map(|mut v| v.push("metrics_fact_coverage".to_string())); }
+    panthersdk::domain::metrics::evaluate_fact_coverage(&facts, &cand)
+}
+
+#[no_mangle]
 pub extern "C" fn panther_metrics_record(name: *const c_char, value: f64) -> i32 {
     if let Some(engine) = ENGINE.get() {
         let nm = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };

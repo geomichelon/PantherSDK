@@ -182,9 +182,11 @@ AI Evaluation CLI (Batch)
 - Run multi‑prompt evaluations locally with concurrency and artifacts.
 - Examples:
   - JSONL input:
-    - `panther-ai-eval --input data.jsonl --providers providers.json --out outputs --max-concurrency 4 --with-proof`
+    - `panther-ai-eval --input samples/data/eval_sample.jsonl --out outputs --max-concurrency 4 --with-proof --metrics rouge,factcheck`
+    - Providers: copy `samples/data/providers.example.json` → `providers.json`, ajuste as credenciais e use `--providers providers.json` (ou configure variáveis de ambiente para OpenAI/Ollama).
   - CSV input:
-    - `panther-ai-eval --input data.csv --providers providers.json --out outputs`
+    - `panther-ai-eval --input samples/data/eval_sample.csv --out outputs`
+    - Providers: use `--providers providers.json` (JSON). A CSV example is available at `samples/data/providers.example.csv` for reference, but the CLI expects JSON for `--providers`.
   - Single‑run:
     - `panther-ai-eval "Explain insulin function"`
 - Inputs:

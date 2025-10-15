@@ -26,6 +26,9 @@ struct Cli {
     /// Compute and include proof per item
     #[arg(long)]
     with_proof: bool,
+    /// Comma-separated metrics to compute (e.g., rouge,factcheck)
+    #[arg(long)]
+    metrics: Option<String>,
     /// Optional positional prompt for single-run mode
     prompt: Vec<String>,
 }
@@ -128,6 +131,7 @@ async fn run_batch(cli: &Cli, validator: Arc<LLMValidator>) -> Result<()> {
         let validator = validator.clone();
         let out_dir = cli.out.clone();
         let with_proof = cli.with_proof;
+        let metrics = cli.metrics.clone().unwrap_or_default();
         let providers_json = if let Some(pth) = cli.providers_path.clone() { fs::read_to_string(pth).unwrap_or_else(|_| "[]".to_string()) } else { "[]".to_string() };
         let guidelines_json = fs::read_to_string(cli.guidelines.clone().unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../panther-validation/guidelines/anvisa.json"))).unwrap_or_else(|_| "[]".to_string());
         let permit = semaphore.clone().acquire_owned().await?;
@@ -146,6 +150,31 @@ async fn run_batch(cli: &Cli, validator: Arc<LLMValidator>) -> Result<()> {
                         if let Ok(proof) = panther_validation::proof::compute_proof(out_obj["prompt"].as_str().unwrap(), &providers_json, &guidelines_json, &results_json, &ctx) {
                             out_obj["proof"] = serde_json::to_value(proof).unwrap_or(serde_json::json!({}));
                         }
+                    }
+                    // Optional metrics
+                    if !metrics.is_empty() {
+                        let mut extra = serde_json::Map::new();
+                        let text_best = results.iter().max_by(|a,b| a.adherence_score.partial_cmp(&b.adherence_score).unwrap()).map(|r| r.raw_text.clone()).unwrap_or_default();
+                        for m in metrics.split(',').map(|s| s.trim().to_lowercase()) {
+                            match m.as_str() {
+                                "rouge" => {
+                                    let r = panthersdk::domain::metrics::evaluate_rouge_l(&out_obj["prompt"].as_str().unwrap(), &text_best);
+                                    extra.insert("rouge_l".to_string(), serde_json::json!(r));
+                                }
+                                "factcheck" => {
+                                    // Extract expected terms from guidelines (best-effort)
+                                    let facts: Vec<String> = serde_json::from_str::<serde_json::Value>(&guidelines_json)
+                                        .ok()
+                                        .and_then(|v| v.as_array().cloned())
+                                        .map(|arr| arr.into_iter().flat_map(|g| g.get("expected_terms").and_then(|e| e.as_array()).cloned().unwrap_or_default()).filter_map(|x| x.as_str().map(|s| s.to_string())).collect())
+                                        .unwrap_or_default();
+                                    let score = panthersdk::domain::metrics::evaluate_fact_coverage(&facts, &text_best);
+                                    extra.insert("fact_coverage".to_string(), serde_json::json!(score));
+                                }
+                                _ => {}
+                            }
+                        }
+                        if !extra.is_empty() { out_obj["metrics"] = serde_json::Value::Object(extra); }
                     }
                 }
                 Err(e) => {
@@ -178,6 +207,7 @@ async fn run_batch(cli: &Cli, validator: Arc<LLMValidator>) -> Result<()> {
         }
     }
     let mut wtr = csv::Writer::from_path(cli.out.join("summary.csv"))?;
+    // Summary header (add slots for optional metrics)
     wtr.write_record(["provider","total","errors","p50_ms","p95_ms"]).ok();
     for (prov, (tot, errs, mut lats)) in per {
         lats.sort();

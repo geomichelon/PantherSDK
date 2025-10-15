@@ -371,6 +371,8 @@ pub fn agent_poll(run_id: &str, cursor: usize) -> Result<(Vec<AgentEvent>, bool,
 pub fn agent_status(run_id: &str) -> Result<(String, bool)> {
     let map = runs().lock().unwrap();
     let st = map.get(run_id).ok_or_else(|| anyhow::anyhow!("run not found"))?;
+    // Touch started_ts to avoid dead_code warning and allow future elapsed reporting
+    let _elapsed_ms = now_ms().saturating_sub(st.started_ts);
     Ok((st.status.clone(), st.status == "done"))
 }
 

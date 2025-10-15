@@ -29,3 +29,4 @@ panther-observability = { path = "../crates/panther-observability" }
 panther-metrics = { path = "../crates/panther-metrics" }
 panther-storage = { path = "../crates/panther-storage" }
 panther-storage-sled = { path = "../crates/panther-storage-sled" }
+panther-metrics-content = { path = "../crates/panther-metrics-content" }

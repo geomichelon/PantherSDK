@@ -102,6 +102,19 @@ public enum PantherSDK {
         _ = panther_metrics_record(name, value)
     }
 
+    // Plagiarism score (Jaccard n-gram MVP) via FFI
+    public static func plagiarism(corpus: [String], candidate: String) -> Double {
+        let data = try? JSONEncoder().encode(corpus)
+        let json = String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
+        return panther_metrics_plagiarism(json, candidate)
+    }
+
+    public static func plagiarism(corpus: [String], candidate: String, ngram: Int) -> Double {
+        let data = try? JSONEncoder().encode(corpus)
+        let json = String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
+        return panther_metrics_plagiarism_ngram(json, candidate, Int32(ngram > 0 ? ngram : 3))
+    }
+
     public static func listMetricNames() -> [String] {
         guard let ptr = panther_storage_list_metrics() else { return [] }
         let json = String(cString: ptr)

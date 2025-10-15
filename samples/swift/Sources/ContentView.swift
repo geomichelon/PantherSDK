@@ -10,6 +10,11 @@ struct ContentView: View {
     @State private var anchoredStatus: String? = nil
     @State private var explorerURL: String? = nil
     @State private var contractURL: String? = nil
+    // Plagiarism (n-gram) inputs
+    @State private var plagCorpus: String = "Insulin regulates glucose in the blood.\nVitamin C supports the immune system."
+    @State private var plagCandidate: String = "Insulin regulates glucose in the blood."
+    @State private var plagNgram: String = "3"
+    @State private var plagScore: Double? = nil
 
     private struct ProviderPreset {
         let label: String
@@ -155,6 +160,34 @@ struct ContentView: View {
                         }
                         if let cu = contractURL, let url = URL(string: cu) {
                             Link("View Contract", destination: url)
+                        }
+                    }
+
+                    Divider()
+                    Text("Plagiarism (Jaccard n-gram)")
+                        .font(.headline)
+                    Text("Corpus (one per line):")
+                    TextEditor(text: $plagCorpus)
+                        .frame(minHeight: 100)
+                        .border(Color.gray.opacity(0.3))
+                    Text("Candidate text:")
+                    TextField("Candidate", text: $plagCandidate)
+                        .textFieldStyle(.roundedBorder)
+                    HStack {
+                        Button("Check Plagiarism") {
+                            let lines = plagCorpus.split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+                            let n = Int(plagNgram) ?? 3
+                            let s = PantherSDK.plagiarism(corpus: lines, candidate: plagCandidate, ngram: n)
+                            plagScore = s
+                        }
+                        .buttonStyle(.bordered)
+                        Text("n-gram:")
+                        TextField("3", text: $plagNgram)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 60)
+                        if let ps = plagScore {
+                            Text(String(format: "Score: %.2f", ps))
+                                .font(.subheadline)
                         }
                     }
                 }

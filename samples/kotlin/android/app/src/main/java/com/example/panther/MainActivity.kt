@@ -269,6 +269,42 @@ class MainActivity : AppCompatActivity() {
                 outputView.text = outputView.text.toString() + "\nNo contract URL."
             }
         }
+
+        // --- Plagiarism (Jaccard n-gram) section ---
+        val plagTitle = TextView(this).apply { text = "Plagiarism (Jaccard n-gram)"; textSize = 18f }
+        val plagCorpusInput = EditText(this).apply {
+            hint = "Corpus (one per line)"
+            setLines(4); isSingleLine = false
+            setText("Insulin regulates glucose in the blood.\nVitamin C supports the immune system.")
+        }
+        val plagCandidateInput = EditText(this).apply {
+            hint = "Candidate text"
+            setText("Insulin regulates glucose in the blood.")
+        }
+        val plagNInput = EditText(this).apply { hint = "n-gram (3)"; setText("3"); inputType = InputType.TYPE_CLASS_NUMBER }
+        val btnPlag = Button(this).apply { text = "Check Plagiarism" }
+        btnPlag.setOnClickListener {
+            try {
+                val lines = plagCorpusInput.text.toString().split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                val cand = plagCandidateInput.text.toString()
+                val n = plagNInput.text.toString().toIntOrNull() ?: 3
+                val score = PantherBridge.plagiarismScore(lines, cand, n)
+                outputView.text = outputView.text.toString() + "\nPlagiarism score: ${String.format("%.2f", score)}"
+            } catch (e: Exception) {
+                outputView.text = outputView.text.toString() + "\nPlagiarism error: ${e.message}"
+            }
+        }
+
+        // Add to content
+        content.addView(plagTitle)
+        content.addView(plagCorpusInput)
+        content.addView(plagCandidateInput)
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row.addView(btnPlag)
+        val lbl = TextView(this).apply { text = "  n-gram: " }
+        row.addView(lbl)
+        row.addView(plagNInput)
+        content.addView(row)
     }
 
     private fun applyPreset(preset: ProviderPreset, base: EditText, model: EditText, apiKey: EditText) {

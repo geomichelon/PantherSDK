@@ -111,6 +111,34 @@ def init_db():
             """
         )
         DB.execute("CREATE INDEX IF NOT EXISTS idx_proof_history_hash ON proof_history(hash)")
+        # Fact-check audit table (optional)
+        DB.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factcheck_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts INTEGER NOT NULL,
+                text_hash TEXT NOT NULL,
+                method TEXT,
+                contradiction_method TEXT,
+                params_json TEXT,
+                result_json TEXT
+            )
+            """
+        )
+        DB.execute("CREATE INDEX IF NOT EXISTS idx_factcheck_text_hash ON factcheck_audit(text_hash)")
+        # Guided rewrite audit table (optional)
+        DB.execute(
+            """
+            CREATE TABLE IF NOT EXISTS rewrite_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts INTEGER NOT NULL,
+                text_hash TEXT NOT NULL,
+                params_json TEXT,
+                result_text TEXT
+            )
+            """
+        )
+        DB.execute("CREATE INDEX IF NOT EXISTS idx_rewrite_text_hash ON rewrite_audit(text_hash)")
         DB.commit()
     except Exception:
         DB = None
@@ -132,6 +160,34 @@ def db_insert_event(ev: dict):
                     ev.get("explorer_url"),
                     ev.get("contract_url"),
                 ),
+            )
+            DB.commit()
+    except Exception:
+        pass
+
+
+def db_insert_factcheck_audit(ts: int, text_hash: str, method: str | None, contradiction_method: str | None, params_json: str, result_json: str):
+    if DB is None:
+        return
+    try:
+        with DB_LOCK:
+            DB.execute(
+                "INSERT INTO factcheck_audit(ts, text_hash, method, contradiction_method, params_json, result_json) VALUES(?,?,?,?,?,?)",
+                (int(ts), text_hash, method or '', contradiction_method or '', params_json, result_json),
+            )
+            DB.commit()
+    except Exception:
+        pass
+
+
+def db_insert_rewrite_audit(ts: int, text_hash: str, params_json: str, result_text: str):
+    if DB is None:
+        return
+    try:
+        with DB_LOCK:
+            DB.execute(
+                "INSERT INTO rewrite_audit(ts, text_hash, params_json, result_text) VALUES(?,?,?,?)",
+                (int(ts), text_hash, params_json, result_text),
             )
             DB.commit()
     except Exception:

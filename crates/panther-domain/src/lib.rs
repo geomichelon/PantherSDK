@@ -57,6 +57,20 @@ pub mod ports {
         fn set(&self, key: &str, value: String) -> anyhow::Result<()>;
         fn delete(&self, key: &str) -> anyhow::Result<()>;
     }
+
+    // Content metrics port for hexagonal architecture
+    pub trait ContentMetrics: Send + Sync {
+        fn accuracy(&self, expected: &str, generated: &str) -> f64;
+        fn bleu(&self, reference: &str, candidate: &str) -> f64;
+        fn coherence(&self, text: &str) -> f64;
+        fn diversity(&self, samples: &[String]) -> f64;
+        fn fluency(&self, text: &str) -> f64;
+        fn rouge_l(&self, reference: &str, candidate: &str) -> f64;
+        fn fact_coverage(&self, facts: &[String], candidate: &str) -> f64;
+        fn factcheck_adv(&self, facts: &[String], candidate: &str) -> f64;
+        fn plagiarism(&self, corpus: &[String], candidate: &str) -> f64;
+        fn plagiarism_ngram(&self, corpus: &[String], candidate: &str, n: usize) -> f64;
+    }
 }
 
 #[cfg(test)]

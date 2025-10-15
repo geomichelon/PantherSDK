@@ -86,6 +86,58 @@ def metrics_evaluate(req: EvaluateRequest, _auth=Depends(auth_guard)):
             return {"score": float(s)}
         low = req.text.lower(); hits = sum(1 for f in facts if f and f.lower() in low); tot = max(1,len(facts))
         return {"score": hits / tot}
+    if m in ("factcheck-adv","factcheck_adv") and req.text is not None and req.samples is not None:
+        facts = req.samples
+        if lib and hasattr(lib, "panther_metrics_factcheck_adv"):
+            s = lib.panther_metrics_factcheck_adv(json.dumps(facts).encode("utf-8"), req.text.encode("utf-8"))
+            return {"score": float(s)}
+        # Fallback: heuristic contradiction penalty near facts
+        neg = {"not","no","never","without","contraindicated","avoid"}
+        toks = req.text.lower().split()
+        def coverage(fs: list[str]) -> float:
+            low = req.text.lower();
+            hits = sum(1 for f in fs if f and f.lower() in low); tot = max(1,len(fs)); return hits/tot
+        def contradictions(fs: list[str]) -> float:
+            c = 0
+            for f in fs:
+                if not f: continue
+                f0 = f.split()[0].lower()
+                for i,t in enumerate(toks):
+                    if t == f0:
+                        w = toks[max(0,i-3):min(len(toks),i+3)]
+                        if any(x in neg for x in w): c += 1; break
+            return c/ max(1,len(fs))
+        cov = coverage(facts); con = contradictions(facts)
+        score = max(0.0, min(1.0, cov * (1.0 - 0.7*con)))
+        return {"score": score, "coverage": cov, "contradiction_rate": con}
+    if m == "plagiarism" and req.text is not None and req.samples is not None:
+        lib = get_rust()
+        if lib and hasattr(lib, "panther_metrics_plagiarism"):
+            try:
+                import json as _j
+                s = lib.panther_metrics_plagiarism(_j.dumps(req.samples).encode("utf-8"), req.text.encode("utf-8"))
+                return {"score": float(s)}
+            except Exception:
+                pass
+        # Fallback: Jaccard of 3-grams
+        import re
+        def norm(t: str) -> list[str]:
+            t = t.lower()
+            t = re.sub(r"[^a-z0-9\s]", " ", t)
+            return [x for x in t.split() if x]
+        def ngrams(ws: list[str], n: int = 3) -> set[str]:
+            if len(ws) < n: return set()
+            return {" ".join(ws[i:i+n]) for i in range(0, len(ws)-n+1)}
+        cand = ngrams(norm(req.text), 3)
+        if not cand: return {"score": 0.0}
+        best = 0.0
+        for doc in req.samples:
+            gs = ngrams(norm(doc), 3)
+            if not gs: continue
+            inter = len(cand & gs); uni = len(cand | gs)
+            s = (inter / uni) if uni else 0.0
+            if s > best: best = s
+        return {"score": best}
     return {"error": "unsupported or missing fields"}
 
 
@@ -94,4 +146,3 @@ def metrics_exporter():
     if not _PROM:
         raise HTTPException(status_code=503, detail="prometheus not enabled")
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)  # type: ignore
-

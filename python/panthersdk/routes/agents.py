@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
-import os, threading
+import os, threading, time, json, ctypes
+from ctypes import c_char_p
 from pydantic import BaseModel
 import json
 import time
@@ -8,6 +9,27 @@ from ctypes import c_char_p
 import ctypes
 
 router = APIRouter()
+
+# Prometheus (optional)
+try:
+    from prometheus_client import Counter, Histogram, Gauge
+    _PROM = True
+except Exception:
+    _PROM = False
+    Counter = Histogram = Gauge = None  # type: ignore
+
+if _PROM:
+    AG_RUNS_STARTED = Counter('panther_agents_runs_started_total', 'Total agent runs started')
+    AG_RUNS_COMPLETED = Counter('panther_agents_runs_completed_total', 'Total agent runs completed')
+    AG_RUNS_FAILED = Counter('panther_agents_runs_failed_total', 'Total agent runs failed')
+    AG_RUNS_INPROG = Gauge('panther_agents_runs_in_progress', 'Agent runs currently in progress')
+    AG_STAGE_STARTED = Counter('panther_agents_stage_started_total', 'Agent stage started', ['stage'])
+    AG_STAGE_COMPLETED = Counter('panther_agents_stage_completed_total', 'Agent stage completed', ['stage'])
+    AG_STAGE_DURATION = Histogram('panther_agents_stage_duration_seconds', 'Agent stage duration (seconds)', ['stage'])
+    AG_EVENTS_TOTAL = Counter('panther_agents_events_total', 'Agent events received', ['stage'])
+else:
+    AG_RUNS_STARTED = AG_RUNS_COMPLETED = AG_RUNS_FAILED = AG_RUNS_INPROG = None  # type: ignore
+    AG_STAGE_STARTED = AG_STAGE_COMPLETED = AG_STAGE_DURATION = AG_EVENTS_TOTAL = None  # type: ignore
 
 
 class AgentRunRequest(BaseModel):
@@ -18,6 +40,45 @@ class AgentRunRequest(BaseModel):
 
 _AGENT_RUNS: dict[str, dict] = {}
 _AGENT_LOCK = DB_LOCK  # reuse global lock for simplicity
+
+# Track stage start timestamps per run for duration computation
+_STAGE_STARTS: dict[tuple[str, str], int] = {}
+
+def _stage_mark_start(run_id: str, stage: str, ts_ms: int):
+    _STAGE_STARTS[(run_id, stage)] = ts_ms
+    if AG_STAGE_STARTED: AG_STAGE_STARTED.labels(stage).inc()
+
+def _stage_mark_complete(run_id: str, stage: str, ts_ms: int):
+    if AG_STAGE_COMPLETED: AG_STAGE_COMPLETED.labels(stage).inc()
+    key = (run_id, stage)
+    if key in _STAGE_STARTS:
+        started = _STAGE_STARTS.pop(key)
+        dur_s = max(0.0, (ts_ms - started) / 1000.0)
+        if AG_STAGE_DURATION: AG_STAGE_DURATION.labels(stage).observe(dur_s)
+
+def _update_metrics_from_events(run_id: str, events: list[dict], done: bool, status: str):
+    for ev in events:
+        stage = str(ev.get('stage', 'unknown'))
+        msg = str(ev.get('message', ''))
+        ts = int(ev.get('ts', int(time.time()*1000)))
+        if AG_EVENTS_TOTAL: AG_EVENTS_TOTAL.labels(stage).inc()
+        # heuristic start/complete detection by message
+        if 'starting' in msg:
+            _stage_mark_start(run_id, stage, ts)
+        if stage == 'validate' and 'validation complete' in msg:
+            _stage_mark_complete(run_id, stage, ts)
+        elif stage == 'seal' and 'proof computed' in msg:
+            _stage_mark_complete(run_id, stage, ts)
+        elif stage == 'anchor' and 'anchor tx submitted' in msg:
+            _stage_mark_complete(run_id, stage, ts)
+        elif stage == 'status' and 'status checked' in msg:
+            _stage_mark_complete(run_id, stage, ts)
+    if done:
+        if status == 'done':
+            if AG_RUNS_COMPLETED: AG_RUNS_COMPLETED.inc()
+        else:
+            if AG_RUNS_FAILED: AG_RUNS_FAILED.inc()
+        if AG_RUNS_INPROG: AG_RUNS_INPROG.dec()
 
 
 @router.post("/agent/run")
@@ -93,7 +154,10 @@ def agent_start(req: AgentRunRequest, _auth=Depends(auth_guard)):
         s = lib.panther_agent_start(json.dumps(plan).encode("utf-8"), json.dumps(input_obj).encode("utf-8"))
         try:
             data = ctypes.cast(s, c_char_p).value.decode("utf-8")
-            return json.loads(data)
+            out = json.loads(data)
+            if out.get('run_id') and AG_RUNS_STARTED:
+                AG_RUNS_STARTED.inc(); AG_RUNS_INPROG.inc()
+            return out
         finally:
             lib.panther_free_string(s)
     return {"error": "agents FFI unavailable"}
@@ -106,7 +170,12 @@ def agent_poll(run_id: str, cursor: int = 0, _auth=Depends(auth_guard)):
         s = lib.panther_agent_poll(run_id.encode("utf-8"), str(cursor).encode("utf-8"))
         try:
             data = ctypes.cast(s, c_char_p).value.decode("utf-8")
-            return json.loads(data)
+            out = json.loads(data)
+            try:
+                _update_metrics_from_events(run_id, out.get('events', []), bool(out.get('done')), str(out.get('status','')))
+            except Exception:
+                pass
+            return out
         finally:
             lib.panther_free_string(s)
     return {"error": "agents FFI unavailable"}

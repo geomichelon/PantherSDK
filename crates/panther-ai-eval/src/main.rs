@@ -29,6 +29,9 @@ struct Cli {
     /// Comma-separated metrics to compute (e.g., rouge,factcheck)
     #[arg(long)]
     metrics: Option<String>,
+    /// USD per 1k tokens (estimate cost for outputs)
+    #[arg(long, value_name = "USD_PER_1K")]
+    usd_per_1k: Option<f64>,
     /// Optional positional prompt for single-run mode
     prompt: Vec<String>,
 }
@@ -190,7 +193,7 @@ async fn run_batch(cli: &Cli, validator: Arc<LLMValidator>) -> Result<()> {
 
     // Summary per provider
     let res_text = fs::read_to_string(cli.out.join("results.jsonl")).unwrap_or_default();
-    let mut per: std::collections::HashMap<String, (usize, usize, Vec<i64>)> = std::collections::HashMap::new();
+    let mut per: std::collections::HashMap<String, (usize, usize, Vec<i64>, usize)> = std::collections::HashMap::new();
     for line in res_text.lines() {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
             if let Some(arr) = v.get("results").and_then(|r| r.as_array()) {
@@ -198,23 +201,31 @@ async fn run_batch(cli: &Cli, validator: Arc<LLMValidator>) -> Result<()> {
                     let prov = r.get("provider_name").and_then(|s| s.as_str()).unwrap_or("").to_string();
                     let lat = r.get("latency_ms").and_then(|n| n.as_i64()).unwrap_or(0);
                     let adher = r.get("adherence_score").and_then(|n| n.as_f64()).unwrap_or(0.0);
-                    let e = per.entry(prov).or_insert((0,0,Vec::new()));
-                    e.0 += 1;
-                    if adher == 0.0 { e.1 += 1; }
-                    e.2.push(lat);
+                    let toks = r.get("raw_text").and_then(|s| s.as_str()).map(|t| t.split_whitespace().count()).unwrap_or(0);
+                    let e = per.entry(prov).or_insert((0,0,Vec::new(),0));
+                    e.0 += 1; // total
+                    if adher == 0.0 { e.1 += 1; } // errors
+                    e.2.push(lat); // latencies
+                    e.3 += toks; // tokens
                 }
             }
         }
     }
     let mut wtr = csv::Writer::from_path(cli.out.join("summary.csv"))?;
-    // Summary header (add slots for optional metrics)
-    wtr.write_record(["provider","total","errors","p50_ms","p95_ms"]).ok();
-    for (prov, (tot, errs, mut lats)) in per {
+    let header = if cli.usd_per_1k.is_some() { vec!["provider","total","errors","p50_ms","p95_ms","avg_tokens","est_cost_usd"] } else { vec!["provider","total","errors","p50_ms","p95_ms","avg_tokens"] };
+    wtr.write_record(header).ok();
+    for (prov, (tot, errs, mut lats, toks)) in per {
         lats.sort();
         let idx = |p: f64| -> usize { if lats.is_empty() { 0 } else { ((p * (lats.len() as f64 - 1.0)).round() as isize).clamp(0, lats.len() as isize - 1) as usize } };
         let p50 = lats.get(idx(0.50)).cloned().unwrap_or(0);
         let p95 = lats.get(idx(0.95)).cloned().unwrap_or(0);
-        let _ = wtr.write_record(&[prov, tot.to_string(), errs.to_string(), p50.to_string(), p95.to_string()]);
+        let avg_tokens = if tot > 0 { (toks as f64 / tot as f64).round() as i64 } else { 0 };
+        if let Some(usd_per_1k) = cli.usd_per_1k {
+            let est_cost = (toks as f64 / 1000.0) * usd_per_1k;
+            let _ = wtr.write_record(&[prov, tot.to_string(), errs.to_string(), p50.to_string(), p95.to_string(), avg_tokens.to_string(), format!("{:.4}", est_cost)]);
+        } else {
+            let _ = wtr.write_record(&[prov, tot.to_string(), errs.to_string(), p50.to_string(), p95.to_string(), avg_tokens.to_string()]);
+        }
     }
     let _ = wtr.flush();
     println!("\nBatch completed. Artifacts: {}", cli.out.display());

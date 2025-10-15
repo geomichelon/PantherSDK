@@ -67,9 +67,9 @@ Execução em lote (suites)
 - Implemented: `panther-ai-eval` com `--input {jsonl|csv}`, `--max-concurrency`, `--with-proof`, outputs `results.jsonl` + `summary.csv`
 - Missing/Next: diretórios de cenários/presets e relatórios enriquecidos
 
-- Feedback em tempo real
-- Implemented: SSE básico em `/agent/events/stream` (pings durante execução + eventos ao finalizar)
-- Missing/Next: streaming incremental por evento (FFI start/poll/status/result)
+ - Feedback em tempo real
+ - Implemented: SSE incremental em `/agent/events/stream` (eventos em tempo real) e API incremental (`/agent/start`, `/agent/poll`)
+ - Missing/Next: headers customizados no SSE (RN usa fallback por polling quando necessário)
 
 Monitoramento contínuo (KPIs/benchmarks)
 - Implemented: contadores/histogramas básicos; Prometheus parcial (anchor/status)

@@ -250,6 +250,57 @@ pub extern "C" fn panther_agent_run(plan_json_c: *const c_char, input_json_c: *c
     }
 }
 
+// Incremental agents API
+#[cfg(feature = "agents")]
+#[no_mangle]
+pub extern "C" fn panther_agent_start(plan_json_c: *const c_char, input_json_c: *const c_char) -> *mut std::os::raw::c_char {
+    let plan_json = unsafe { CStr::from_ptr(plan_json_c).to_string_lossy().into_owned() };
+    let input_json = unsafe { CStr::from_ptr(input_json_c).to_string_lossy().into_owned() };
+    match panther_agents::agent_start(&plan_json, &input_json) {
+        Ok(run_id) => rust_string_to_c(serde_json::json!({"run_id": run_id}).to_string()),
+        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+    }
+}
+
+#[cfg(feature = "agents")]
+#[no_mangle]
+pub extern "C" fn panther_agent_poll(run_id_c: *const c_char, cursor_c: *const c_char) -> *mut std::os::raw::c_char {
+    let run_id = unsafe { CStr::from_ptr(run_id_c).to_string_lossy().into_owned() };
+    let cursor_s = unsafe { CStr::from_ptr(cursor_c).to_string_lossy().into_owned() };
+    let cursor = cursor_s.parse::<usize>().unwrap_or(0);
+    match panther_agents::agent_poll(&run_id, cursor) {
+        Ok((events, done, new_cursor)) => {
+            let out = serde_json::json!({"events": events, "done": done, "cursor": new_cursor});
+            rust_string_to_c(out.to_string())
+        }
+        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+    }
+}
+
+#[cfg(feature = "agents")]
+#[no_mangle]
+pub extern "C" fn panther_agent_status(run_id_c: *const c_char) -> *mut std::os::raw::c_char {
+    let run_id = unsafe { CStr::from_ptr(run_id_c).to_string_lossy().into_owned() };
+    match panther_agents::agent_status(&run_id) {
+        Ok((status, done)) => {
+            let out = serde_json::json!({"status": status, "done": done});
+            rust_string_to_c(out.to_string())
+        }
+        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+    }
+}
+
+#[cfg(feature = "agents")]
+#[no_mangle]
+pub extern "C" fn panther_agent_result(run_id_c: *const c_char) -> *mut std::os::raw::c_char {
+    let run_id = unsafe { CStr::from_ptr(run_id_c).to_string_lossy().into_owned() };
+    match panther_agents::agent_result(&run_id) {
+        Ok(Some(outcome)) => rust_string_to_c(serde_json::to_string(&outcome).unwrap_or_else(|_| "{}".to_string())),
+        Ok(None) => rust_string_to_c("null".to_string()),
+        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn panther_generate(prompt_c: *const c_char) -> *mut std::os::raw::c_char {
     let prompt = unsafe { CStr::from_ptr(prompt_c).to_string_lossy().into_owned() };

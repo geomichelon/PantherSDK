@@ -101,3 +101,26 @@ export async function getAgentEvents(runId: string, apiBase?: string, apiKey?: s
   });
   return res.json();
 }
+
+export async function startAgent(plan: any, input: any, apiBase?: string, apiKey?: string): Promise<{run_id?: string; error?: string}> {
+  const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+  const res = await fetch(`${base}/agent/start`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    },
+    body: JSON.stringify({ plan, input })
+  });
+  return res.json();
+}
+
+export async function pollAgent(runId: string, cursor: number, apiBase?: string, apiKey?: string): Promise<{events: any[]; cursor: number; done: boolean; error?: string}> {
+  const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+  const res = await fetch(`${base}/agent/poll?run_id=${encodeURIComponent(runId)}&cursor=${cursor}`, {
+    headers: {
+      ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    },
+  });
+  return res.json();
+}

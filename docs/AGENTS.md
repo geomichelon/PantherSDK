@@ -49,7 +49,9 @@ API (Python)
   - `POST /agent/run` body: `{ plan: {...} | null, input: {...}, async_run?: bool }`
   - `GET /agent/status?run_id=...`
   - `GET /agent/events?run_id=...`
-  - `GET /agent/events/stream?run_id=...` (SSE; entrega eventos ao concluir o run)
+  - `GET /agent/events/stream?run_id=...` (SSE incremental; emite eventos conforme ocorrem)
+  - `POST /agent/start` → `{ run_id }`
+  - `GET /agent/poll?run_id=...&cursor=0` → `{ events, done, cursor }`
 
 Samples
 - React Native sample inclui botão “Run Agent” e helpers HTTP em `samples/react_native/Panther.ts`:
@@ -74,6 +76,13 @@ curl -sX POST http://127.0.0.1:8000/agent/run \
 curl -s "http://127.0.0.1:8000/agent/status?run_id=<id>"
 curl -s "http://127.0.0.1:8000/agent/events?run_id=<id>" | jq
 curl -Ns "http://127.0.0.1:8000/agent/events/stream?run_id=<id>"
+
+# Incremental (start/poll)
+curl -sX POST http://127.0.0.1:8000/agent/start \
+  -H 'Content-Type: application/json' \
+  -d '{ "plan": {"type":"ValidateSealAnchor"}, "input": {"prompt":"...","providers":[...]}}'
+# => {"run_id":"r..."}
+curl -s "http://127.0.0.1:8000/agent/poll?run_id=<id>&cursor=0" | jq
 ```
 
 Persistência
@@ -81,5 +90,9 @@ Persistência
 
 Notas
 - Timeouts e retries por etapa já aplicados no runner (validate/anchor/status), com backoff exponencial e jitter.
-- SSE entrega pings de status durante a execução e eventos em lote ao finalizar (sem streaming de cada evento em tempo real ainda).
+- SSE incremental: `/agent/events/stream` emite eventos em tempo real (sem esperar o fim). Headers customizados não são suportados pelo EventSource; se precisar de `X-API-Key`, use o fallback `/agent/poll`.
 - Integração direta dos samples ainda não está ativa; use o backend HTTP por enquanto.
+
+RN/Web (SSE)
+- Web: `new EventSource('/agent/events/stream?run_id=...')`
+- React Native: use uma lib (ex.: `react-native-sse`/`react-native-event-source`) ou o fallback por polling (`/agent/poll`).

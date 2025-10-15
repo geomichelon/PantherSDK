@@ -172,6 +172,23 @@ Prometheus metrics (Stage 3)
   - `panther_anchor_requests_total`, `panther_anchor_success_total`, `panther_anchor_latency_seconds`
   - `panther_status_checks_total`
 - Install deps in `python/pyproject.toml` or `pip install prometheus_client`.
+ - Validation metrics:
+   - `panther_validation_requests_total`, `panther_validation_errors_total`
+   - `panther_validation_errors_labeled_total{provider,category}`
+   - `panther_validation_latency_seconds` (histogram p50/p95 via histogram_quantile)
+   - `panther_validation_provider_latency_seconds{provider}` (avg/quantiles) e `panther_validation_provider_errors_total{provider}`
+
+Prometheus scrape (example)
+```
+- job_name: 'panther-api'
+  scrape_interval: 10s
+  static_configs:
+    - targets: ['127.0.0.1:8000']
+  metrics_path: /metrics
+```
+
+Grafana dashboard
+- Import `docs/dashboards/panther_validation_dashboard.json` em Grafana para visualizar p50/p95, latência média por provider e erros por provider.
 
 CLI usage (panther-cli)
 - Validate: `panther validate "prompt here"`

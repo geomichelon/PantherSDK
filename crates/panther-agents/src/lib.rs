@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
+use once_cell::sync::OnceCell;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -276,4 +279,211 @@ pub fn run_plan(plan_json: &str, input_json: &str) -> Result<AgentRunResult> {
     let input: AgentInput = serde_json::from_str(input_json)?;
     let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
     rt.block_on(run_plan_async(plan, input))
+}
+
+// ---- Incremental manager (start/poll/status/result) ----
+
+#[derive(Default)]
+struct RunState {
+    status: String,
+    events: Vec<AgentEvent>,
+    outcome: Option<AgentOutcome>,
+    started_ts: i64,
+    finished_ts: Option<i64>,
+}
+
+static RUNS: OnceCell<Mutex<HashMap<String, RunState>>> = OnceCell::new();
+
+fn runs() -> &'static Mutex<HashMap<String, RunState>> {
+    RUNS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn push_event(run_id: &str, ev: AgentEvent) {
+    if let Ok(mut map) = runs().lock() {
+        if let Some(st) = map.get_mut(run_id) {
+            st.events.push(ev);
+        }
+    }
+}
+
+fn finish_run(run_id: &str, outcome: AgentOutcome) {
+    if let Ok(mut map) = runs().lock() {
+        if let Some(st) = map.get_mut(run_id) {
+            st.status = "done".to_string();
+            st.finished_ts = Some(now_ms());
+            st.outcome = Some(outcome);
+        }
+    }
+}
+
+fn set_status(run_id: &str, status: &str) {
+    if let Ok(mut map) = runs().lock() {
+        if let Some(st) = map.get_mut(run_id) {
+            st.status = status.to_string();
+        }
+    }
+}
+
+fn new_run_state() -> RunState {
+    RunState { status: "running".to_string(), events: Vec::new(), outcome: None, started_ts: now_ms(), finished_ts: None }
+}
+
+pub fn agent_start(plan_json: &str, input_json: &str) -> Result<String> {
+    let plan: AgentPlan = serde_json::from_str(plan_json)?;
+    let input: AgentInput = serde_json::from_str(input_json)?;
+    // generate run id
+    let run_id = format!("r{}", now_ms());
+    {
+        let mut map = runs().lock().unwrap();
+        map.insert(run_id.clone(), new_run_state());
+    }
+    // spawn background thread with a runtime
+    let run_id_clone = run_id.clone();
+    std::thread::spawn(move || {
+        if let Ok(rt) = tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+            let res = rt.block_on(run_plan_async_with_id(plan, input, &run_id_clone));
+            if let Ok(r) = res {
+                finish_run(&run_id_clone, r.outcome);
+            } else {
+                set_status(&run_id_clone, "error: run failed");
+            }
+        } else {
+            set_status(&run_id_clone, "error: runtime init failed");
+        }
+    });
+    Ok(run_id)
+}
+
+pub fn agent_poll(run_id: &str, cursor: usize) -> Result<(Vec<AgentEvent>, bool, usize)> {
+    let (events, done);
+    {
+        let map = runs().lock().unwrap();
+        let st = map.get(run_id).ok_or_else(|| anyhow::anyhow!("run not found"))?;
+        let total = st.events.len();
+        let from = cursor.min(total);
+        events = st.events[from..].to_vec();
+        done = st.status == "done";
+    }
+    let new_cursor = cursor + events.len();
+    Ok((events, done, new_cursor))
+}
+
+pub fn agent_status(run_id: &str) -> Result<(String, bool)> {
+    let map = runs().lock().unwrap();
+    let st = map.get(run_id).ok_or_else(|| anyhow::anyhow!("run not found"))?;
+    Ok((st.status.clone(), st.status == "done"))
+}
+
+pub fn agent_result(run_id: &str) -> Result<Option<AgentOutcome>> {
+    let map = runs().lock().unwrap();
+    let st = map.get(run_id).ok_or_else(|| anyhow::anyhow!("run not found"))?;
+    Ok(st.outcome.clone())
+}
+
+async fn run_plan_async_with_id(plan: AgentPlan, input: AgentInput, run_id: &str) -> Result<AgentRunResult> {
+    let mut events: Vec<AgentEvent> = Vec::new();
+    let mut outcome = AgentOutcome { results: None, proof: None, tx_hash: None, anchored: None };
+
+    match plan {
+        AgentPlan::ValidateSealAnchor { guidelines_json, anchor, timeouts_ms, retries } => {
+            let guidelines_json = match guidelines_json {
+                Some(s) => s,
+                None => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../panther-validation/guidelines/anvisa.json")).to_string(),
+            };
+
+            let t_validate = timeouts_ms.as_ref().and_then(|t| t.validate_ms).unwrap_or(30_000);
+            let _t_anchor = timeouts_ms.as_ref().and_then(|t| t.anchor_ms).unwrap_or(30_000);
+            let _t_status = timeouts_ms.as_ref().and_then(|t| t.status_ms).unwrap_or(5_000);
+            let r_validate = retries.as_ref().and_then(|r| r.validate).unwrap_or(0);
+            let _r_anchor = retries.as_ref().and_then(|r| r.anchor).unwrap_or(0);
+            let _r_status = retries.as_ref().and_then(|r| r.status).unwrap_or(0);
+
+            let ev = AgentEvent { ts: now_ms(), stage: "validate".into(), message: format!("starting validation (retries={})", r_validate), data: None };
+            push_event(run_id, ev.clone()); events.push(ev);
+            let mut _last_err: Option<anyhow::Error> = None;
+            let mut attempt = 0u32;
+            let results = loop {
+                let ev = AgentEvent { ts: now_ms(), stage: "validate".into(), message: format!("attempt {}", attempt + 1), data: None };
+                push_event(run_id, ev.clone()); events.push(ev);
+                let fut = do_validate(&input.prompt, &input.providers, &guidelines_json);
+                match tokio::time::timeout(Duration::from_millis(t_validate), fut).await {
+                    Ok(Ok(v)) => break v,
+                    Ok(Err(e)) => { _last_err = Some(e); }
+                    Err(_) => { _last_err = Some(anyhow::anyhow!("timeout: validate exceeded {} ms", t_validate)); }
+                }
+                if attempt >= r_validate { break Err(_last_err.unwrap_or_else(|| anyhow::anyhow!("validate failed")))?; }
+                let wait = (200u64.saturating_mul(1 << attempt.min(4))) + ((attempt as u64 * 37) % 120);
+                tokio::time::sleep(Duration::from_millis(wait.min(2_000))).await;
+                attempt += 1;
+            };
+            let ev = AgentEvent { ts: now_ms(), stage: "validate".into(), message: "validation complete".into(), data: Some(serde_json::to_value(&results).unwrap_or(Value::Null)) };
+            push_event(run_id, ev.clone()); events.push(ev);
+            outcome.results = Some(results.clone());
+
+            let ev = AgentEvent { ts: now_ms(), stage: "seal".into(), message: "computing proof".into(), data: None };
+            push_event(run_id, ev.clone()); events.push(ev);
+            let providers_json = serde_json::to_string(&input.providers).unwrap_or_else(|_| "[]".to_string());
+            let results_json = serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_string());
+            let ctx = panther_validation::proof::ProofContext { sdk_version: env!("CARGO_PKG_VERSION").to_string(), salt: input.salt.clone() };
+            let proof = panther_validation::proof::compute_proof(&input.prompt, &providers_json, &guidelines_json, &results_json, &ctx)?;
+            let ev = AgentEvent { ts: now_ms(), stage: "seal".into(), message: "proof computed".into(), data: Some(serde_json::to_value(&proof).unwrap_or(Value::Null)) };
+            push_event(run_id, ev.clone()); events.push(ev);
+            outcome.proof = Some(proof.clone());
+
+            if let Some(a) = anchor {
+                #[cfg(feature = "blockchain-eth")]
+                {
+                    let t_anchor = _t_anchor; let r_anchor = _r_anchor; let t_status = _t_status; let r_status = _r_status;
+                    let ev = AgentEvent { ts: now_ms(), stage: "anchor".into(), message: format!("anchoring on-chain (retries={})", r_anchor), data: None };
+                    push_event(run_id, ev.clone()); events.push(ev);
+                    let mut last_err: Option<anyhow::Error> = None;
+                    let mut attempt = 0u32;
+                    let res = loop {
+                        let ev = AgentEvent { ts: now_ms(), stage: "anchor".into(), message: format!("attempt {}", attempt + 1), data: None };
+                        push_event(run_id, ev.clone()); events.push(ev);
+                        let fut = panther_validation::anchor_eth::anchor_proof(&proof.combined_hash, &a.rpc_url, &a.contract_addr, &a.priv_key);
+                        match tokio::time::timeout(Duration::from_millis(t_anchor), fut).await {
+                            Ok(Ok(v)) => break v,
+                            Ok(Err(e)) => { last_err = Some(e); }
+                            Err(_) => { last_err = Some(anyhow::anyhow!("timeout: anchor exceeded {} ms", t_anchor)); }
+                        }
+                        if attempt >= r_anchor { break Err(last_err.unwrap_or_else(|| anyhow::anyhow!("anchor failed")))?; }
+                        let wait = (300u64.saturating_mul(1 << attempt.min(4))) + ((attempt as u64 * 41) % 150);
+                        tokio::time::sleep(Duration::from_millis(wait.min(3_000))).await;
+                        attempt += 1;
+                    };
+                    let ev = AgentEvent { ts: now_ms(), stage: "anchor".into(), message: "anchor tx submitted".into(), data: Some(serde_json::to_value(&res).ok().unwrap_or(Value::Null)) };
+                    push_event(run_id, ev.clone()); events.push(ev);
+                    outcome.tx_hash = Some(res.tx_hash.clone());
+                    let mut last_err: Option<anyhow::Error> = None;
+                    let mut attempt = 0u32;
+                    let anchored = loop {
+                        let ev = AgentEvent { ts: now_ms(), stage: "status".into(), message: format!("checking status (attempt {} of {})", attempt + 1, r_status + 1), data: None };
+                        push_event(run_id, ev.clone()); events.push(ev);
+                        let fut = panther_validation::anchor_eth::is_anchored(&proof.combined_hash, &a.rpc_url, &a.contract_addr);
+                        match tokio::time::timeout(Duration::from_millis(t_status), fut).await {
+                            Ok(Ok(v)) => break v,
+                            Ok(Err(e)) => { last_err = Some(e); }
+                            Err(_) => { last_err = Some(anyhow::anyhow!("timeout: status exceeded {} ms", t_status)); }
+                        }
+                        if attempt >= r_status { break false; }
+                        let wait = (500u64.saturating_mul(1 << attempt.min(3))) + ((attempt as u64 * 47) % 200);
+                        tokio::time::sleep(Duration::from_millis(wait.min(4_000))).await;
+                        attempt += 1;
+                    };
+                    outcome.anchored = Some(anchored);
+                    let ev = AgentEvent { ts: now_ms(), stage: "status".into(), message: "status checked".into(), data: Some(serde_json::json!({"anchored": anchored})) };
+                    push_event(run_id, ev.clone()); events.push(ev);
+                }
+                #[cfg(not(feature = "blockchain-eth"))]
+                {
+                    let _ = &a;
+                    let ev = AgentEvent { ts: now_ms(), stage: "anchor".into(), message: "blockchain feature disabled".into(), data: None };
+                    push_event(run_id, ev.clone()); events.push(ev);
+                }
+            }
+        }
+    }
+
+    Ok(AgentRunResult { outcome, events })
 }

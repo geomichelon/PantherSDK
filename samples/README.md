@@ -6,6 +6,7 @@ Swift (iOS Simulator)
 - Path: samples/swift
 - Project generator: XcodeGen (`project.yml`).
 - UI: Buttons for Record Metric, Refresh Items (lists metric names), Get Logs, and Validation.
+- Plagiarism (FFI): use `PantherSDK.plagiarism(corpus:[String], candidate:String, ngram:Int)` to compute a Jaccard n‑gram score (default 3).
 - Validation: White‑label — pick provider type and enter Base URL / Model / API Key (for OpenAI‑like). App calls a single FFI `panther_validation_run_multi` via a Swift façade (`PantherSDK`).
 - Steps:
   1) `rustup target add aarch64-apple-ios-sim`
@@ -18,6 +19,10 @@ Android (Kotlin JNI, Emulator)
 - Build files: Kotlin DSL (`build.gradle.kts`, `settings.gradle.kts`).
 - UI: Buttons for Record Metric, List Items (metric names), Get Logs, plus fields for provider (type/base/model/key) and Validate.
 - Validation: White‑label — Kotlin `PantherSDK.make(listOf(LLM(...)))` then `validate(prompt)`.
+- Plagiarism (FFI):
+  - Build corpus JSON: `val json = PantherBridge.corpusJson(listOf("doc A", "doc B"))`
+  - Score: `val s = PantherBridge.metricsPlagiarismNgram(json, "candidate text", 3)`
+  - Or: `val s = PantherBridge.plagiarismScore(listOf("doc A","doc B"), "candidate text", 3)`
 - Steps:
   1) `cargo install cargo-ndk`
   2) `rustup target add x86_64-linux-android`
@@ -29,6 +34,8 @@ Flutter
 - Path: samples/flutter
 - Included: FFI bindings + example app with fields for provider (type/base/model/key). Calls `validateMulti(prompt, providersJson)`.
 - Note: This sample uses Dart FFI directly. If you require platform channels with intermediate Swift/Kotlin layers, I can scaffold a plugin-style project on request.
+- Plagiarism (FFI):
+  - `final s = ffi.metricsPlagiarismNgram(["doc A","doc B"], "candidate text", 3);`
 - Steps:
   1) Run `samples/flutter/GENERATE_PROJECT.sh`
   2) In generated app, `flutter pub add ffi`
@@ -38,6 +45,7 @@ React Native
 - Path: samples/react_native
 - Includes iOS Objective‑C module and Android Java + JNI wrappers with a JS module (`Panther.ts`).
 - Validation: Use `validateMulti(prompt, providersJson)` from `Panther.ts` (pass JSON array of providers as described above).
+- Plagiarism (API): Use the helper `evaluatePlagiarism(text, samples, apiBase?, apiKey?, ngram?)` and render the returned `{score}`.
 - Steps:
   1) `samples/react_native/GENERATE_PROJECT.sh` to create a CLI RN project and copy scaffolding.
   2) Build platform libs and headers (as above), link iOS static lib + header, and place Android `.so` into `jniLibs`.

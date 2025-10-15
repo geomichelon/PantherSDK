@@ -128,6 +128,11 @@ def _load_rust_lib():
                     lib.panther_metrics_plagiarism.restype = ctypes.c_double
                 except Exception:
                     pass
+                try:
+                    lib.panther_metrics_plagiarism_ngram.argtypes = [c_char_p, c_char_p, ctypes.c_int]
+                    lib.panther_metrics_plagiarism_ngram.restype = ctypes.c_double
+                except Exception:
+                    pass
                 if lib.panther_init() == 0:
                     return lib
             except Exception:

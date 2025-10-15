@@ -27,6 +27,11 @@ double panther_metrics_rouge_l(const char *reference, const char *candidate);
 
 double panther_metrics_fact_coverage(const char *facts_json, const char *candidate);
 
+double panther_metrics_factcheck_adv(const char *facts_json, const char *candidate);
+
+double panther_metrics_plagiarism(const char *corpus_json, const char *candidate);
+double panther_metrics_plagiarism_ngram(const char *corpus_json, const char *candidate, int32_t ngram);
+
 int32_t panther_metrics_record(const char *name, double value);
 
 char *panther_bias_detect(const char *samples_json);

@@ -6,6 +6,8 @@ typedef _c_init = ffi.Int32 Function();
 typedef _c_generate = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>);
 typedef _c_free = ffi.Void Function(ffi.Pointer<ffi.Char>);
 typedef _c_metrics_bleu = ffi.Double Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_metrics_plagiarism = ffi.Double Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_metrics_plagiarism_ngram = ffi.Double Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Int32);
 typedef _c_validate = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>);
 typedef _c_validate_multi = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
 typedef _c_version = ffi.Pointer<ffi.Char> Function();
@@ -17,6 +19,8 @@ class PantherFFI {
   late final _c_generate _generate;
   late final _c_free _free;
   late final _c_metrics_bleu _bleu;
+  late final _c_metrics_plagiarism _plag;
+  late final _c_metrics_plagiarism_ngram _plagNgram;
   late final _c_validate _validate;
   late final _c_validate_multi _validateMulti;
   late final _c_version _version;
@@ -37,6 +41,8 @@ class PantherFFI {
     _generate = _lib.lookupFunction<_c_generate, _c_generate>('panther_generate');
     _free = _lib.lookupFunction<_c_free, _c_free>('panther_free_string');
     _bleu = _lib.lookupFunction<_c_metrics_bleu, _c_metrics_bleu>('panther_metrics_bleu');
+    _plag = _lib.lookupFunction<_c_metrics_plagiarism, _c_metrics_plagiarism>('panther_metrics_plagiarism');
+    _plagNgram = _lib.lookupFunction<_c_metrics_plagiarism_ngram, _c_metrics_plagiarism_ngram>('panther_metrics_plagiarism_ngram');
     _validate = _lib.lookupFunction<_c_validate, _c_validate>('panther_validation_run_default');
     _validateMulti = _lib.lookupFunction<_c_validate_multi, _c_validate_multi>('panther_validation_run_multi');
     _version = _lib.lookupFunction<_c_version, _c_version>('panther_version_string');
@@ -59,6 +65,27 @@ class PantherFFI {
     final cCand = candidate.toNativeUtf8(allocator: pkg_ffi.malloc);
     final score = _bleu(cRef.cast(), cCand.cast());
     pkg_ffi.malloc.free(cRef);
+    pkg_ffi.malloc.free(cCand);
+    return score;
+  }
+
+  double metricsPlagiarism(List<String> corpus, String candidate) {
+    final corpusJson = '[${corpus.map((s) => '"${s.replaceAll('"', '\\"')}"').join(',')}]';
+    final cJson = corpusJson.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final cCand = candidate.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final score = _plag(cJson.cast(), cCand.cast());
+    pkg_ffi.malloc.free(cJson);
+    pkg_ffi.malloc.free(cCand);
+    return score;
+  }
+
+  double metricsPlagiarismNgram(List<String> corpus, String candidate, int ngram) {
+    final corpusJson = '[${corpus.map((s) => '"${s.replaceAll('"', '\\"')}"').join(',')}]';
+    final cJson = corpusJson.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final cCand = candidate.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final n = ngram > 0 ? ngram : 3;
+    final score = _plagNgram(cJson.cast(), cCand.cast(), n);
+    pkg_ffi.malloc.free(cJson);
     pkg_ffi.malloc.free(cCand);
     return score;
   }

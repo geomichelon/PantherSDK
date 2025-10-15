@@ -8,11 +8,14 @@ Status Highlights
   - Core runtime (Rust), FFI estável, validação multi‑provider (ANVISA), provas offline + ancoragem on‑chain (opcional)
   - Agents (Stage 6) com orquestração Validate → Seal → Anchor → Status, timeouts/retries, SSE incremental e persistência (SQLite)
   - API Python modular (routers: health, validation, metrics, proof, agents)
-  - AI Eval CLI (batch): JSONL/CSV, concorrência, artifacts (results.jsonl/summary.csv), `--with-proof`, `--metrics rouge,factcheck`, `--usd-per-1k`; RAG com flags `--rag-*` e artifacts `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`
+  - AI Eval CLI (batch): JSONL/CSV, concorrência, artifacts (results.jsonl/summary.csv), `--with-proof`, `--metrics rouge,factcheck,plagiarism`, `--usd-per-1k`; RAG com flags `--rag-*` e artifacts `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`; Consistência multi‑prompt com `--variants`, `--scenarios` e relatório `consistency_report.html`; Modo API‑backed para `factcheck_sources`/`contextual_relevance`/`bias_rewrite`
   - Métricas de conteúdo: Acurácia, BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage
   - Prometheus: validação por provider + Agents (estágios) com dashboards (docs/dashboards)
   - Providers assíncronos (OpenAI/Ollama) com timeouts/retries básicos (features opcionais)
   - Plágio (MVP): similaridade Jaccard de n‑gramas (3‑gramas) exposta via métricas/FFI/API/CLI
+  - Fact‑checking avançado (MVP): API `metric=factcheck_sources` (coverage + top fontes + contradições heurísticas/NLI opcional)
+  - Bias avançado (MVP): API `metric=bias_adv` com `group_counts`/`disparity`
+  - Porta `ContentMetrics` no domínio com implementação padrão e injeção (trait + default impl)
 
 - <span style="color:#ef6c00"><b>🟡 Parcial</b></span>
   - Monitoramento/KPIs (validação por provider: latência/erros; faltam dashboards/alertas abrangentes e KPIs consolidados)
@@ -22,7 +25,6 @@ Status Highlights
 
 - <span style="color:#d32f2f"><b>⛔ Faltando</b></span>
   - Fact‑checking avançado (fontes/contradições)
-  - Porta `ContentMetrics` no domínio (atualmente panther‑metrics‑content é implementação utilitária; falta a trait/porta e injeção)
   - SQL/Analytics (esquema, queries, export/import, relatórios)
   - Experimentos reprodutíveis (Gherkin/COPA; RAG tuning) e recomendações
   - CI/CD completo (artefatos multi‑plataforma; wheels Python)
@@ -32,8 +34,8 @@ Overview
 - Validation (guidelines ANVISA, multi‑provider, ranking): implemented
 - Proofs (offline) + On‑chain anchoring (optional): implemented
 - Agents (Stage 6) orchestration: implemented (Validate → Seal → Anchor → Status) com timeouts/retries, SSE básico e persistência SQLite de runs
-- Python API (FastAPI) para governança/auditoria: implemented (inclui métricas rouge/factcheck)
-- AI Eval CLI (Batch): implemented (JSONL/CSV, concorrência, artifacts, proof opcional, flags de métricas)
+- Python API (FastAPI) para governança/auditoria: implemented (inclui métricas rouge/factcheck/plagiarism/factcheck_sources/bias_adv/contextual_relevance/bias_rewrite)
+- AI Eval CLI (Batch): implemented (JSONL/CSV, concorrência, artifacts, proof opcional; `--metrics ...`, `--variants`, `--scenarios`, relatório HTML opcional)
 - Samples (Swift/Kotlin/Flutter/RN): validação; RN com “Run Agent” via API e helpers
 
 ==================================================
@@ -43,13 +45,26 @@ Status: <span style="color:#ef6c00"><b>~45%</b></span> [████████
 Chatbots / Conversational AI
 - ✅ Implemented:
   - Multi‑provider validation (OpenAI/Ollama), ranking por adherence score
-  - Consistência multi‑prompt: `consistency_index` por provider em batch (summary_consistency.csv)
-  - Métricas de coerência/diversidade/fluência/BLEU; latência p50 no CLI
-  - Bias básico (contagem de pronomes) via FFI/Python
-- ⛔ Missing/Next:
-  - Fact‑checking (comparar saídas com fontes/fatos)
-  - Consistência multi‑prompt (bateladas com variação de prompt)
-  - Bias avançado (métricas contextualizadas e mitigação)
+  - Consistência multi‑prompt: `consistency_index` por provider em batch (summary_consistency.csv) e agregação multi‑cenário (`--scenarios` → consistency_multiprompt.csv); variações de prompt via `--variants`
+  - Métricas de coerência/diversidade/fluência/BLEU; latência p50/p95 no CLI
+  - Plágio (MVP Jaccard n‑gramas) via API/CLI
+  - Fact‑checking com fontes (MVP `factcheck_sources`) + heurística `factcheck_adv` + NLI opcional para contradições
+  - Bias básico (contagem de pronomes) via FFI/Python e bias avançado (MVP `bias_adv`)
+ - ⛔ Missing/Next (checklist):
+  - Fact‑checking avançado completo
+    - [x] Embeddings (opcional) para similaridade
+    - [x] Evidências com highlights (spans) no candidato
+    - [x] NLI (opcional) para contradições
+    - [x] Thresholds por fonte e ranking/auditoria por caso
+  - Consistência multi‑prompt
+    - [x] Presets/cenários (YAML/JSON) e variações controladas (`--variants`)
+    - [x] Agregação multi‑cenário (CSV) e relatório HTML básico
+    - [x] Análise estatística avançada e relatórios gráficos comparativos (incl. custos)
+  - Bias avançado
+    - [x] Dicionários por idioma/domínio (MVP)
+    - [x] Neutralização simples (sugestões de reescrita)
+    - [x] Métricas contextuais por domínio/idioma (MVP `contextual_relevance`)
+    - [x] Mitigação aprimorada (reescrita guiada) — `bias_rewrite` com LLM opcional e fallback rule-based; auditoria em SQLite
 
 Geração de código
 - ✅ Implemented: —
@@ -73,9 +88,9 @@ Workflows Enterprise (RAG & Assistentes)
 
 ==================================================
 B. Evaluation Metrics
-Status: <span style="color:#2e7d32"><b>~78%</b></span> [████████████████░░]
+Status: <span style="color:#2e7d32"><b>~80%</b></span> [█████████████████░]
 
-- ✅ Implemented: Acurácia (exact match), BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage (básico), Plágio (MVP Jaccard n‑gramas)
+- ✅ Implemented: Acurácia (exact match), BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage (básico), Plágio (MVP Jaccard n‑gramas), Fact‑checking com fontes (MVP `factcheck_sources`), Bias avançado (MVP `bias_adv`)
 - ⛔ Missing/Next: Plagiarismo avançado (top‑k fontes, embeddings/SimHash), fact‑checking avançado (fontes/contradições), custos por provider/modelo (tabelas de preços) e métricas customizadas por indústria
 
 ==================================================
@@ -149,10 +164,10 @@ Feature Map (by crate)
  - panther-ffi: C ABI estável; validation/metrics/storage/logs/helpers; blockchain opcional — OK (métricas novas: rouge_l, fact_coverage, plagiarism)
 - panther-agents (Stage 6): Runner + FFI + API; timeouts/retries; logs/events — OK
 - panther-cli: validate + proof status/history — OK (batch pendente)
- - panther-ai-eval: CLI de avaliação em batch (JSONL/CSV), concorrência e artifacts (results.jsonl/summary.csv), flags `--metrics rouge,factcheck`, `--usd-per-1k`, RAG `--rag-*` com `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`
+ - panther-ai-eval: CLI de avaliação em batch (JSONL/CSV), concorrência e artifacts (results.jsonl/summary.csv), flags `--metrics rouge,factcheck,plagiarism`, `--plag-corpus/--plag-ngram`, `--variants ...`, `--scenarios dir/` (agregação em `consistency_multiprompt.csv`), `--usd-per-1k`, RAG `--rag-*` com `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`; modo `--api-base` para chamar métricas avançadas da API (`factcheck_sources`, `contextual_relevance`, `bias_rewrite`)
 - panther-storage / sled: KV in‑memory/sled — OK (SQL pendente)
 - panther-observability / panther-metrics: logging/metrics básicos — OK (exporters pendentes)
- - python/panthersdk: FastAPI (generate/metrics/validation/proof/agents) — OK (suporta `metric=rouge|factcheck|plagiarism`), modularizada (routers)
+- python/panthersdk: FastAPI (generate/metrics/validation/proof/agents) — OK (suporta `metric=rouge|factcheck|plagiarism|factcheck_sources|bias_adv|contextual_relevance|bias_rewrite`), modularizada (routers)
  - panther-metrics-content: métricas de conteúdo (BLEU/ROUGE‑L/…); panthersdk delega — OK
 - samples (Swift/Kotlin/Flutter/RN): validação; RN com “Run Agent” — OK
 
@@ -211,8 +226,7 @@ Backlog por Feature (detalhado)
   - Custos por provider/modelo (tabelas de preços input/output) — CLI já estima via `--usd-per-1k`
 
 - Arquitetura (Hexagonal)
-  - Porta `ContentMetrics` no domínio; implementação em `panther-metrics-content`
-  - Delegação via trait nas camadas superiores (mantendo FFI/API)
+  - Porta `ContentMetrics` no domínio com implementação padrão e delegação via trait (mantendo FFI/API)
 
 - SSE nas plataformas
   - Swift/Android: SSE (ou polling) com UI de progresso
@@ -232,11 +246,11 @@ Backlog por Feature (detalhado)
 
 ==================================================
 Progress Summary (Percentual)
-- Geral: <span style="color:#ef6c00"><b>~55%</b></span> [███████████░░░░░░░]
-- A. Casos de Uso: <span style="color:#ef6c00"><b>~45%</b></span> [█████████░░░░░░░░]
-- B. Métricas: <span style="color:#2e7d32"><b>~78%</b></span> [████████████████░░]
+- Geral: <span style="color:#ef6c00"><b>~60%</b></span> [█████████████░░░░░]
+- A. Casos de Uso: <span style="color:#ef6c00"><b>~50%</b></span> [██████████░░░░░░░░]
+- B. Métricas: <span style="color:#2e7d32"><b>~80%</b></span> [█████████████████░]
 - C. Integração & Benefícios: <span style="color:#2e7d32"><b>~70%</b></span> [██████████████░░░░]
-- D. Execução/Feedback/Monitoramento: <span style="color:#ef6c00"><b>~65%</b></span> [█████████████░░░░░]
+- D. Execução/Feedback/Monitoramento: <span style="color:#ef6c00"><b>~68%</b></span> [█████████████░░░░░]
 - E. Funcionalidades Únicas: <span style="color:#ef6c00"><b>~40%</b></span> [████████░░░░░░░░░░]
 - F. Experimentos & Recomendações: <span style="color:#d32f2f"><b>~0%</b></span> [░░░░░░░░░░░░░░░░░░]
 - G. Resultado de Negócio: <span style="color:#ef6c00"><b>~50%</b></span> [██████████░░░░░░░░]

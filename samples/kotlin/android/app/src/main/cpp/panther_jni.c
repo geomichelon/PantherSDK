@@ -28,6 +28,28 @@ Java_com_example_panther_PantherBridge_metricsBleu(JNIEnv* env, jclass clazz, js
     return score;
 }
 
+JNIEXPORT jdouble JNICALL
+Java_com_example_panther_PantherBridge_metricsPlagiarism(JNIEnv* env, jclass clazz, jstring corpusJson, jstring candidate) {
+    (void)clazz;
+    const char* cj = (*env)->GetStringUTFChars(env, corpusJson, 0);
+    const char* c = (*env)->GetStringUTFChars(env, candidate, 0);
+    double score = panther_metrics_plagiarism(cj, c);
+    (*env)->ReleaseStringUTFChars(env, corpusJson, cj);
+    (*env)->ReleaseStringUTFChars(env, candidate, c);
+    return score;
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_example_panther_PantherBridge_metricsPlagiarismNgram(JNIEnv* env, jclass clazz, jstring corpusJson, jstring candidate, jint ngram) {
+    (void)clazz;
+    const char* cj = (*env)->GetStringUTFChars(env, corpusJson, 0);
+    const char* c = (*env)->GetStringUTFChars(env, candidate, 0);
+    double score = panther_metrics_plagiarism_ngram(cj, c, (int32_t) (ngram > 0 ? ngram : 3));
+    (*env)->ReleaseStringUTFChars(env, corpusJson, cj);
+    (*env)->ReleaseStringUTFChars(env, candidate, c);
+    return score;
+}
+
 JNIEXPORT jstring JNICALL
 Java_com_example_panther_PantherBridge_validate(JNIEnv* env, jclass clazz, jstring prompt) {
     (void)clazz;

@@ -24,3 +24,15 @@ pub fn evaluate_rouge_l(reference: &str, candidate: &str) -> f64 {
 pub fn evaluate_fact_coverage(facts: &[String], candidate: &str) -> f64 {
     panther_metrics_content::evaluate_fact_coverage(facts, candidate)
 }
+
+pub fn evaluate_factcheck_adv(facts: &[String], candidate: &str) -> f64 {
+    panther_metrics_content::evaluate_factcheck_adv_score(facts, candidate)
+}
+
+// Plagiarism metrics (Jaccard of n-grams)
+pub fn evaluate_plagiarism(corpus: &[String], candidate: &str) -> f64 {
+    panther_metrics_content::evaluate_plagiarism(corpus, candidate)
+}
+pub fn evaluate_plagiarism_ngram(corpus: &[String], candidate: &str, n: usize) -> f64 {
+    panther_metrics_content::evaluate_plagiarism_ngram(corpus, candidate, n)
+}

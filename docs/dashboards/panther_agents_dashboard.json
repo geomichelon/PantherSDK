@@ -1,0 +1,31 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {"type":"row","title":"Agents Overview","gridPos":{"h":1,"w":24,"x":0,"y":0}},
+    {"type":"stat","title":"Runs Started","targets":[{"expr":"sum(increase(panther_agents_runs_started_total[5m]))"}],"gridPos":{"h":6,"w":6,"x":0,"y":1}},
+    {"type":"stat","title":"Runs Completed","targets":[{"expr":"sum(increase(panther_agents_runs_completed_total[5m]))"}],"gridPos":{"h":6,"w":6,"x":6,"y":1}},
+    {"type":"stat","title":"In Progress","targets":[{"expr":"panther_agents_runs_in_progress"}],"gridPos":{"h":6,"w":6,"x":12,"y":1}},
+    {"type":"timeseries","title":"Events by Stage","targets":[{"expr":"sum by (stage) (increase(panther_agents_events_total[5m]))","legendFormat":"{{stage}}"}],"gridPos":{"h":8,"w":24,"x":0,"y":7}},
+    {"type":"row","title":"Stage Durations","gridPos":{"h":1,"w":24,"x":0,"y":15}},
+    {"type":"timeseries","title":"Duration p50/p95 (s)","targets":[
+      {"expr":"histogram_quantile(0.50, sum by (stage, le) (rate(panther_agents_stage_duration_seconds_bucket[5m])))","legendFormat":"p50 {{stage}}"},
+      {"expr":"histogram_quantile(0.95, sum by (stage, le) (rate(panther_agents_stage_duration_seconds_bucket[5m])))","legendFormat":"p95 {{stage}}"}
+    ],"gridPos":{"h":8,"w":24,"x":0,"y":16}}
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["panther", "agents"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Panther Agents",
+  "version": 1
+}
+

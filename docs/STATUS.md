@@ -8,18 +8,20 @@ Status Highlights
   - Core runtime (Rust), FFI estável, validação multi‑provider (ANVISA), provas offline + ancoragem on‑chain (opcional)
   - Agents (Stage 6) com orquestração Validate → Seal → Anchor → Status, timeouts/retries, SSE incremental e persistência (SQLite)
   - API Python modular (routers: health, validation, metrics, proof, agents)
-  - AI Eval CLI (batch): JSONL/CSV, concorrência, artifacts (results.jsonl/summary.csv), `--with-proof`, `--metrics rouge,factcheck`, `--usd-per-1k`
+  - AI Eval CLI (batch): JSONL/CSV, concorrência, artifacts (results.jsonl/summary.csv), `--with-proof`, `--metrics rouge,factcheck`, `--usd-per-1k`; RAG com flags `--rag-*` e artifacts `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`
   - Métricas de conteúdo: Acurácia, BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage
-  - Prometheus básico + Dashboard de Validação (docs/dashboards)
+  - Prometheus: validação por provider + Agents (estágios) com dashboards (docs/dashboards)
+  - Providers assíncronos (OpenAI/Ollama) com timeouts/retries básicos (features opcionais)
+  - Plágio (MVP): similaridade Jaccard de n‑gramas (3‑gramas) exposta via métricas/FFI/API/CLI
 
 - <span style="color:#ef6c00"><b>🟡 Parcial</b></span>
   - Monitoramento/KPIs (validação por provider: latência/erros; faltam dashboards/alertas abrangentes e KPIs consolidados)
   - Histórico e analytics (SQLite básico para proofs/runs; faltam esquema SQL para avaliações/métricas e relatórios comparativos)
   - SSE em apps nativos (RN pronto; Swift/Android pendentes)
+  - RAG evaluation: recall/precision@k e experimentos de threshold/chunks via `panther-ai-eval`; faltam datasets rotulados (labels), avaliação com embeddings/similaridade semântica e documentação/presets das flags
 
 - <span style="color:#d32f2f"><b>⛔ Faltando</b></span>
-  - Plágio; fact‑checking avançado (fontes/contradições)
-  - RAG evaluation (recall/precision@k; experimentos thresholds/chunks; dataset e flags `--rag-*`)
+  - Fact‑checking avançado (fontes/contradições)
   - Porta `ContentMetrics` no domínio (atualmente panther‑metrics‑content é implementação utilitária; falta a trait/porta e injeção)
   - SQL/Analytics (esquema, queries, export/import, relatórios)
   - Experimentos reprodutíveis (Gherkin/COPA; RAG tuning) e recomendações
@@ -36,10 +38,12 @@ Overview
 
 ==================================================
 A. Use Cases & Testing Approaches
+Status: <span style="color:#ef6c00"><b>~45%</b></span> [█████████░░░░░░░░]
 
 Chatbots / Conversational AI
 - ✅ Implemented:
   - Multi‑provider validation (OpenAI/Ollama), ranking por adherence score
+  - Consistência multi‑prompt: `consistency_index` por provider em batch (summary_consistency.csv)
   - Métricas de coerência/diversidade/fluência/BLEU; latência p50 no CLI
   - Bias básico (contagem de pronomes) via FFI/Python
 - ⛔ Missing/Next:
@@ -55,24 +59,28 @@ Geração de código
 
 Geração de conteúdo / Sumários
 - ✅ Implemented:
-  - Coerência, diversidade, fluência, BLEU, ROUGE‑L (F1), fact‑checking básico (coverage)
+  - Coerência, diversidade, fluência, BLEU, ROUGE‑L (F1), fact‑checking básico (coverage), Plágio (MVP Jaccard n‑gramas)
 - ⛔ Missing/Next:
-  - Detecção de plágio; fact‑checking avançado (fontes/contradições)
+  - Plágio avançado (top‑k fontes, embeddings/similaridade); fact‑checking avançado (fontes/contradições)
 
 Workflows Enterprise (RAG & Assistentes)
-- ✅ Implemented: —
+- ✅ Implemented:
+  - RAG baseline (recall/precision@k) no `panther-ai-eval` com `--rag-index/--rag-k/--rag-threshold` e artifacts `rag_results.jsonl`/`rag_summary.csv`
 - ⛔ Missing/Next:
-  - Precisão/recall (top‑k), testes de indexação (threshold/chunks)
-  - Auditorias de privacidade (PII), monitoramento de latência/erro por rota
+  - Datasets rotulados (labels) e presets/documentação dos parâmetros `--rag-*`
+  - Avaliação baseada em embeddings/similaridade semântica (além do TF/cosine baseline)
+  - Auditorias de privacidade (PII) e monitoramento por rota (latência p95/erros)
 
 ==================================================
 B. Evaluation Metrics
+Status: <span style="color:#2e7d32"><b>~78%</b></span> [████████████████░░]
 
-- ✅ Implemented: Acurácia (exact match), BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage (básico)
-- ⛔ Missing/Next: Plagiarismo, fact‑checking avançado (fontes/contradições), custos ($/token) e métricas customizadas por indústria
+- ✅ Implemented: Acurácia (exact match), BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage (básico), Plágio (MVP Jaccard n‑gramas)
+- ⛔ Missing/Next: Plagiarismo avançado (top‑k fontes, embeddings/SimHash), fact‑checking avançado (fontes/contradições), custos por provider/modelo (tabelas de preços) e métricas customizadas por indústria
 
 ==================================================
 C. Integration & Key Benefits
+Status: <span style="color:#2e7d32"><b>~70%</b></span> [██████████████░░░░]
 
 - ✅ Implemented:
   - FFI C ABI estável (`panther-ffi`), Python API (FastAPI), Samples mobile/web
@@ -84,6 +92,7 @@ C. Integration & Key Benefits
 
 ==================================================
 D. Execution, Feedback, Monitoring
+Status: <span style="color:#ef6c00"><b>~60%</b></span> [████████████░░░░░░]
 
 Execução em lote (suites)
 - ✅ Implemented: `panther-ai-eval` com `--input {jsonl|csv}`, `--max-concurrency`, `--with-proof`, outputs `results.jsonl` + `summary.csv`
@@ -94,8 +103,8 @@ Execução em lote (suites)
 - ⛔ Missing/Next: headers customizados no SSE (RN usa fallback por polling quando necessário)
 
 Monitoramento contínuo (KPIs/benchmarks)
-- 🟡 Parcial: contadores/histogramas básicos; Prometheus parcial (anchor/status/validation por provider)
-- ⛔ Missing/Next: KPIs definidos, dashboards/alertas abrangentes
+- 🟡 Parcial: Prometheus (anchor/status/validation por provider; agents por etapa), dashboards de validação e agents disponíveis
+- ⛔ Missing/Next: KPIs consolidados e alertas (SLOs por provider/etapa)
 
 Histórico de performance
 - 🟡 Parcial: timeseries simples (storage), history de proofs (SQLite), runs de agentes (SQLite)
@@ -107,12 +116,14 @@ Loops de feedback customizáveis
 
 ==================================================
 E. “Unique” Features
+Status: <span style="color:#ef6c00"><b>~40%</b></span> [████████░░░░░░░░░░]
 
 - ✅ Implemented: Provas/âncoras; Agentes (ProofSeal) com orquestração auditável
 - ⛔ Missing/Next: geração de testes sensível a contexto (setor/regulação); métricas por indústria; integração E2E externa (MagnifAI)
 
 ==================================================
 F. Experiments & Recommendations (Reprodutíveis)
+Status: <span style="color:#d32f2f"><b>~0%</b></span> [░░░░░░░░░░░░░░░░░░]
 
 - ✅ Implemented: —
 - ⛔ Missing/Next:
@@ -121,6 +132,7 @@ F. Experiments & Recommendations (Reprodutíveis)
 
 ==================================================
 G. Business Justification & Outcomes
+Status: <span style="color:#ef6c00"><b>~50%</b></span> [██████████░░░░░░░░]
 
 - ✅ Implemented:
   - Auditabilidade via provas/âncoras; comparativos de modelos por score/latência
@@ -134,13 +146,13 @@ Feature Map (by crate)
 - panther-core: engine generate/generate_async, métricas/storage — OK
 - panther-providers: OpenAI/Ollama (sync/async) — OK (async opcional)
 - panther-validation: guidelines ANVISA, LLMValidator (sync/async), proofs/offchain — OK
- - panther-ffi: C ABI estável; validation/metrics/storage/logs/helpers; blockchain opcional — OK (métricas novas: rouge_l, fact_coverage)
+ - panther-ffi: C ABI estável; validation/metrics/storage/logs/helpers; blockchain opcional — OK (métricas novas: rouge_l, fact_coverage, plagiarism)
 - panther-agents (Stage 6): Runner + FFI + API; timeouts/retries; logs/events — OK
 - panther-cli: validate + proof status/history — OK (batch pendente)
- - panther-ai-eval: CLI de avaliação em batch (JSONL/CSV), concorrência e artifacts (results.jsonl/summary.csv), flags `--metrics rouge,factcheck`, `--usd-per-1k`
+ - panther-ai-eval: CLI de avaliação em batch (JSONL/CSV), concorrência e artifacts (results.jsonl/summary.csv), flags `--metrics rouge,factcheck`, `--usd-per-1k`, RAG `--rag-*` com `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`
 - panther-storage / sled: KV in‑memory/sled — OK (SQL pendente)
 - panther-observability / panther-metrics: logging/metrics básicos — OK (exporters pendentes)
- - python/panthersdk: FastAPI (generate/metrics/validation/proof/agents) — OK (suporta `metric=rouge|factcheck`), modularizada (routers)
+ - python/panthersdk: FastAPI (generate/metrics/validation/proof/agents) — OK (suporta `metric=rouge|factcheck|plagiarism`), modularizada (routers)
  - panther-metrics-content: métricas de conteúdo (BLEU/ROUGE‑L/…); panthersdk delega — OK
 - samples (Swift/Kotlin/Flutter/RN): validação; RN com “Run Agent” — OK
 
@@ -156,10 +168,10 @@ Build/Features Cheatsheet
 Backlog Prioritário
 
 1) Métricas & Verificação de Conteúdo
-   - Plágio; fact‑checking avançado (fontes/contradições); custo por provider
+   - Plágio avançado (top‑k fontes, embeddings/SimHash); fact‑checking avançado (fontes/contradições); custo por provider
 
 2) RAG & Assistentes
-   - Precisão/recall (top‑k); experimentos de indexação (threshold/chunks); relatórios
+   - Datasets rotulados com labels; documentação/presets das flags `--rag-*`; avaliação com embeddings/similaridade semântica; relatórios
 
 3) Streaming em Tempo Real
    - SSE em apps nativos (Swift/Android) e fallback de polling padronizado
@@ -180,7 +192,7 @@ Backlog Prioritário
 Backlog por Feature (detalhado)
 
 - Testes
-  - Métricas de conteúdo: unit tests (rouge_l, fact_coverage, coerência/diversidade/fluência)
+  - Métricas de conteúdo: unit tests (rouge_l, fact_coverage, plágio, coerência/diversidade/fluência)
   - API: testes FastAPI (validation/metrics/agents/proof)
   - Agents: happy‑path incremental (start→eventos→done)
 
@@ -196,7 +208,7 @@ Backlog por Feature (detalhado)
 - Batch/Relatórios
   - Diretórios de cenários (`--scenarios dir/`) e presets
   - Summary enriquecido (top‑k, score mediana, distribuição)
-  - Custo por provider (tabela de preços input/output)
+  - Custos por provider/modelo (tabelas de preços input/output) — CLI já estima via `--usd-per-1k`
 
 - Arquitetura (Hexagonal)
   - Porta `ContentMetrics` no domínio; implementação em `panther-metrics-content`
@@ -207,8 +219,8 @@ Backlog por Feature (detalhado)
   - RN: consolidar lib SSE e guia troubleshooting
 
 - RAG Evaluation
-  - Métricas recall/precision@k; variáveis de indexação (threshold/chunks)
-  - Dataset de exemplo e flags `--rag-*` no batch
+  - Implementado: recall/precision@k; variáveis de indexação (threshold/chunks) e artefatos no CLI
+  - Faltando: dataset de exemplo com labels; avaliação com embeddings/similaridade semântica; documentação/presets `--rag-*`
 
 - SQL/Analytics
   - Esquema para avaliações/métricas; queries; export/import
@@ -220,11 +232,11 @@ Backlog por Feature (detalhado)
 
 ==================================================
 Progress Summary (Percentual)
-- Geral: <span style="color:#ef6c00"><b>~47%</b></span>
-- A. Casos de Uso: <span style="color:#d32f2f"><b>~35%</b></span>
-- B. Métricas: <span style="color:#2e7d32"><b>~75%</b></span>
-- C. Integração & Benefícios: <span style="color:#2e7d32"><b>~70%</b></span>
-- D. Execução/Feedback/Monitoramento: <span style="color:#ef6c00"><b>~55%</b></span>
-- E. Funcionalidades Únicas: <span style="color:#ef6c00"><b>~40%</b></span>
-- F. Experimentos & Recomendações: <span style="color:#d32f2f"><b>~0%</b></span>
-- G. Resultado de Negócio: <span style="color:#ef6c00"><b>~50%</b></span>
+- Geral: <span style="color:#ef6c00"><b>~55%</b></span> [███████████░░░░░░░]
+- A. Casos de Uso: <span style="color:#ef6c00"><b>~45%</b></span> [█████████░░░░░░░░]
+- B. Métricas: <span style="color:#2e7d32"><b>~78%</b></span> [████████████████░░]
+- C. Integração & Benefícios: <span style="color:#2e7d32"><b>~70%</b></span> [██████████████░░░░]
+- D. Execução/Feedback/Monitoramento: <span style="color:#ef6c00"><b>~65%</b></span> [█████████████░░░░░]
+- E. Funcionalidades Únicas: <span style="color:#ef6c00"><b>~40%</b></span> [████████░░░░░░░░░░]
+- F. Experimentos & Recomendações: <span style="color:#d32f2f"><b>~0%</b></span> [░░░░░░░░░░░░░░░░░░]
+- G. Resultado de Negócio: <span style="color:#ef6c00"><b>~50%</b></span> [██████████░░░░░░░░]

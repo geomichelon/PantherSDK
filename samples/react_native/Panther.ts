@@ -124,3 +124,17 @@ export async function pollAgent(runId: string, cursor: number, apiBase?: string,
   });
   return res.json();
 }
+
+// --- Metrics helpers ---
+export async function evaluatePlagiarism(text: string, samples: string[], apiBase?: string, apiKey?: string): Promise<{score?: number; error?: string}> {
+  const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+  const res = await fetch(`${base}/metrics/evaluate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    },
+    body: JSON.stringify({ metric: 'plagiarism', text, samples }),
+  });
+  return res.json();
+}

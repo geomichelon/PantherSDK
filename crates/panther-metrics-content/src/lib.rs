@@ -1,4 +1,36 @@
 fn tokenize(s: &str) -> Vec<&str> { s.split_whitespace().collect() }
+fn normalize_ascii(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        if ch.is_ascii_alphanumeric() || ch.is_whitespace() { out.push(ch.to_ascii_lowercase()); }
+        else if ch.is_ascii_punctuation() { out.push(' '); }
+        else { /* drop non-ascii */ }
+    }
+    out
+}
+fn tokenize_normalized(s: &str) -> Vec<String> {
+    normalize_ascii(s)
+        .split_whitespace()
+        .map(|t| t.to_string())
+        .collect()
+}
+fn ngrams(tokens: &[String], n: usize) -> std::collections::HashSet<String> {
+    let n = n.max(1);
+    let mut set = std::collections::HashSet::new();
+    if tokens.len() < n { return set; }
+    for i in 0..=tokens.len()-n {
+        let g = tokens[i..i+n].join(" ");
+        set.insert(g);
+    }
+    set
+}
+fn jaccard(a: &std::collections::HashSet<String>, b: &std::collections::HashSet<String>) -> f64 {
+    if a.is_empty() && b.is_empty() { return 1.0; }
+    if a.is_empty() || b.is_empty() { return 0.0; }
+    let inter = a.intersection(b).count() as f64;
+    let uni = a.union(b).count() as f64;
+    if uni == 0.0 { 0.0 } else { (inter / uni).clamp(0.0, 1.0) }
+}
 
 pub fn evaluate_accuracy(expected: &str, generated: &str) -> f64 {
     let e = tokenize(expected);
@@ -89,6 +121,58 @@ pub fn evaluate_fact_coverage(facts: &[String], candidate: &str) -> f64 {
     (hits as f64) / (facts.len() as f64)
 }
 
+// Advanced fact-checking (heuristic): combines coverage with contradiction penalty.
+// Contradiction heuristic: presence of negation tokens near the fact term.
+pub fn evaluate_factcheck_adv_score(facts: &[String], candidate: &str) -> f64 {
+    if facts.is_empty() { return 1.0; }
+    let low = candidate.to_ascii_lowercase();
+    let coverage = evaluate_fact_coverage(facts, candidate);
+    let tokens: Vec<&str> = low.split_whitespace().collect();
+    let mut contradictions = 0usize;
+    let neg = ["not","no","never","without","contraindicated","avoid"]; // simple list
+    for f in facts {
+        if f.is_empty() { continue; }
+        // find occurrences of the first word of the fact and look around for negations
+        let f0 = f.split_whitespace().next().unwrap_or("").to_ascii_lowercase();
+        for (i, tok) in tokens.iter().enumerate() {
+            if *tok == f0 {
+                let start = i.saturating_sub(3);
+                let end = (i+3).min(tokens.len());
+                let window = &tokens[start..end];
+                if window.iter().any(|t| neg.contains(t)) {
+                    contradictions += 1;
+                    break;
+                }
+            }
+        }
+    }
+    let rate = (contradictions as f64) / (facts.len() as f64);
+    let beta = 0.7; // weight of contradiction penalty
+    let score = (coverage * (1.0 - beta * rate)).clamp(0.0, 1.0);
+    score
+}
+
+// Plagiarism (MVP): Jaccard similarity of word 3-grams against a corpus; returns best match score.
+pub fn evaluate_plagiarism(corpus: &[String], candidate: &str) -> f64 {
+    evaluate_plagiarism_ngram(corpus, candidate, 3)
+}
+
+pub fn evaluate_plagiarism_ngram(corpus: &[String], candidate: &str, n: usize) -> f64 {
+    if corpus.is_empty() { return 0.0; }
+    let cand_toks = tokenize_normalized(candidate);
+    let cand_set = ngrams(&cand_toks, n);
+    if cand_set.is_empty() { return 0.0; }
+    let mut best = 0.0;
+    for doc in corpus {
+        if doc.is_empty() { continue; }
+        let dt = tokenize_normalized(doc);
+        let ds = ngrams(&dt, n);
+        let s = jaccard(&cand_set, &ds);
+        if s > best { best = s; }
+    }
+    best
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,5 +222,18 @@ mod tests {
         assert!(acc >= 0.0 && acc <= 1.0);
         let bleu = evaluate_bleu("a b c", "a b c");
         assert!(bleu > 0.0);
+    }
+
+    #[test]
+    fn plagiarism_jaccard_trigram() {
+        let corpus = vec![
+            "insulin regulates blood glucose".to_string(),
+            "vitamin c helps immunity".to_string(),
+        ];
+        let cand = "insulin regulates glucose in blood";
+        let s3 = evaluate_plagiarism_ngram(&corpus, cand, 3);
+        let s2 = evaluate_plagiarism_ngram(&corpus, cand, 2);
+        assert!(s3 >= 0.0 && s3 <= 1.0);
+        assert!(s2 >= s3 || (s3 - s2).abs() < 1e-6); // bigram usually >= trigram
     }
 }

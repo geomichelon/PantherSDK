@@ -59,6 +59,7 @@ def _load_rust_lib():
                     "panther_agent_result",
                     "panther_metrics_rouge_l",
                     "panther_metrics_fact_coverage",
+                    "panther_metrics_plagiarism",
                 ]:
                     try:
                         fn = getattr(lib, fname)
@@ -141,4 +142,3 @@ def auth_guard(x_api_key: str | None = Header(default=None)):
     required = os.getenv("PANTHER_API_KEY")
     if required and (x_api_key or "") != required:
         raise HTTPException(status_code=401, detail="invalid api key")
-

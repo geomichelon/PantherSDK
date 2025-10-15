@@ -1,0 +1,43 @@
+groups:
+  - name: panther-validation-alerts
+    interval: 30s
+    rules:
+      - alert: HighValidationLatencyP95
+        expr: histogram_quantile(0.95, sum by (le) (rate(panther_validation_latency_seconds_bucket[5m]))) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Validation p95 latency high"
+          description: "p95 latency over 2s for last 5m"
+
+      - alert: HighValidationErrorRate
+        expr: (increase(panther_validation_errors_total[5m]) / clamp_min(increase(panther_validation_requests_total[5m]), 1)) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Validation error rate > 10%"
+          description: "Errors over requests exceeded threshold in last 5m"
+
+  - name: panther-agents-alerts
+    interval: 30s
+    rules:
+      - alert: AgentStageLatencyP95High
+        expr: histogram_quantile(0.95, sum by (stage, le) (rate(panther_agents_stage_duration_seconds_bucket[5m]))) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent stage p95 latency high"
+          description: "Stage {{ $labels.stage }} p95 > 10s (last 5m)"
+
+      - alert: AgentRunsFailed
+        expr: increase(panther_agents_runs_failed_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Agent runs failed detected"
+          description: ">=1 agent run failed in the last 5m"
+

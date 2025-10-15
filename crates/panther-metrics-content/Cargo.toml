@@ -6,4 +6,4 @@ description = "Content metrics (BLEU, ROUGE-L, coherence, diversity, fluency, fa
 
 [dependencies]
 anyhow.workspace = true
-
+panther-domain = { path = "../panther-domain" }

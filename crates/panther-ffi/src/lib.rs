@@ -140,6 +140,22 @@ pub extern "C" fn panther_metrics_plagiarism(corpus_json: *const c_char, candida
 }
 
 #[no_mangle]
+pub extern "C" fn panther_metrics_plagiarism_ngram(
+    corpus_json: *const c_char,
+    candidate: *const c_char,
+    ngram: i32,
+) -> f64 {
+    let corpus_s = unsafe { CStr::from_ptr(corpus_json).to_string_lossy().into_owned() };
+    let cand = unsafe { CStr::from_ptr(candidate).to_string_lossy().into_owned() };
+    let corpus: Vec<String> = serde_json::from_str(&corpus_s).unwrap_or_default();
+    let n = if ngram <= 0 { 3usize } else { ngram as usize };
+    if let Some(buf) = LOGS.get() {
+        let _ = buf.lock().map(|mut v| v.push(format!("metrics_plagiarism_ngram:{}", n)));
+    }
+    panthersdk::domain::metrics::evaluate_plagiarism_ngram(&corpus, &cand, n)
+}
+
+#[no_mangle]
 pub extern "C" fn panther_metrics_record(name: *const c_char, value: f64) -> i32 {
     if let Some(engine) = ENGINE.get() {
         let nm = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };

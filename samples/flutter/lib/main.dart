@@ -51,6 +51,10 @@ feature/ProofSeal
   late TextEditingController localModelController;
   late TextEditingController apiBaseController;
   late TextEditingController apiKeyControllerApi;
+  late TextEditingController plagCorpusController;
+  late TextEditingController plagCandidateController;
+  late TextEditingController plagNgramController;
+  double? plagScore;
 
   @override
   void initState() {
@@ -64,6 +68,9 @@ feature/ProofSeal
     localModelController = TextEditingController(text: 'llama3');
     apiBaseController = TextEditingController(text: (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000'));
     apiKeyControllerApi = TextEditingController();
+    plagCorpusController = TextEditingController(text: 'Insulin regulates glucose in the blood.\nVitamin C supports the immune system.');
+    plagCandidateController = TextEditingController(text: 'Insulin regulates glucose in the blood.');
+    plagNgramController = TextEditingController(text: '3');
   }
 
   @override
@@ -76,6 +83,9 @@ feature/ProofSeal
     localModelController.dispose();
     apiBaseController.dispose();
     apiKeyControllerApi.dispose();
+    plagCorpusController.dispose();
+    plagCandidateController.dispose();
+    plagNgramController.dispose();
     super.dispose();
   }
 
@@ -274,6 +284,52 @@ feature/ProofSeal
 
 main
               ],
+
+              const SizedBox(height: 16),
+              const Text('Plagiarism (Jaccard n-gram)'),
+              const SizedBox(height: 4),
+              const Text('Corpus (one per line):'),
+              TextField(
+                controller: plagCorpusController,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 8),
+              const Text('Candidate text:'),
+              TextField(
+                controller: plagCandidateController,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      final corpus = plagCorpusController.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                      final cand = plagCandidateController.text;
+                      final n = int.tryParse(plagNgramController.text.trim()) ?? 3;
+                      setState(() {
+                        plagScore = panther.metricsPlagiarismNgram(corpus, cand, n);
+                      });
+                    },
+                    child: const Text('Check Plagiarism'),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('n-gram:'),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 60,
+                    child: TextField(
+                      controller: plagNgramController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  if (plagScore != null) Text('Score: ${plagScore!.toStringAsFixed(2)}'),
+                ],
+              ),
               const SizedBox(height: 16),
               TextField(
                 decoration: const InputDecoration(labelText: 'Reference (BLEU)'),

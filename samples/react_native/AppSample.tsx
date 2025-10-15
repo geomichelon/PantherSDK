@@ -8,7 +8,7 @@ try {
 } catch (_) {
   RNEventSource = null;
 }
-import {init, validateMultiWithProof, anchorProof, startAgent, pollAgent} from './Panther';
+import {init, validateMultiWithProof, anchorProof, startAgent, pollAgent, evaluatePlagiarism} from './Panther';
 
 export default function AppSample() {
   const [prompt, setPrompt] = useState('Explain insulin function');
@@ -40,6 +40,9 @@ export default function AppSample() {
   const [agentStatus, setAgentStatus] = useState<string | null>(null);
   const [agentEvents, setAgentEvents] = useState<string[]>([]);
   const [useSSE, setUseSSE] = useState<boolean>(false);
+  const [plagCorpus, setPlagCorpus] = useState('Insulin regulates glucose in the blood.\nVitamin C supports the immune system.');
+  const [plagNgram, setPlagNgram] = useState<string>('3');
+  const [plagScore, setPlagScore] = useState<number | null>(null);
 
   useEffect(() => {
     init().catch(() => undefined);
@@ -172,6 +175,22 @@ export default function AppSample() {
     }
   };
 
+  const runPlagiarism = async () => {
+    try {
+      const samples = plagCorpus
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      const cand = lines[0] && lines[0].includes('–') ? lines[0] : 'Insulin regulates glucose in the blood.';
+      const n = parseInt(plagNgram, 10);
+      const res = await evaluatePlagiarism(cand, samples, apiBase, apiKey || undefined, isNaN(n) ? undefined : n);
+      if ((res as any).score !== undefined) setPlagScore(Number((res as any).score));
+      else setPlagScore(null);
+    } catch {
+      setPlagScore(null);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.h1}>Panther SDK – React Native Sample</Text>
@@ -225,6 +244,28 @@ export default function AppSample() {
       ) : null}
 
       {agentStatus ? <Text style={styles.proof}>Agent status: {agentStatus}</Text> : null}
+
+      <Text style={styles.h2}>Plagiarism (Jaccard n-gram)</Text>
+      <Text style={{marginBottom: 6}}>Corpus (one per line):</Text>
+      <TextInput
+        style={[styles.input, styles.multiline]}
+        value={plagCorpus}
+        onChangeText={setPlagCorpus}
+        multiline
+      />
+      <View style={styles.row}>
+        <Button title="Check Plagiarism" onPress={runPlagiarism} />
+        {plagScore !== null ? (
+          <Text style={{marginLeft: 12}}>Score: {plagScore?.toFixed(2)}</Text>
+        ) : null}
+        <Text style={{marginLeft: 12}}>n-gram:</Text>
+        <TextInput
+          style={[styles.input, {width: 50, marginLeft: 6}]}
+          keyboardType="number-pad"
+          value={plagNgram}
+          onChangeText={setPlagNgram}
+        />
+      </View>
 
       {!!agentEvents.length && (
         <>

@@ -173,6 +173,22 @@ pub fn evaluate_plagiarism_ngram(corpus: &[String], candidate: &str, n: usize) -
     best
 }
 
+// Default implementation for the ContentMetrics port
+pub struct DefaultContentMetrics;
+
+impl panther_domain::ports::ContentMetrics for DefaultContentMetrics {
+    fn accuracy(&self, expected: &str, generated: &str) -> f64 { evaluate_accuracy(expected, generated) }
+    fn bleu(&self, reference: &str, candidate: &str) -> f64 { evaluate_bleu(reference, candidate) }
+    fn coherence(&self, text: &str) -> f64 { evaluate_coherence(text) }
+    fn diversity(&self, samples: &[String]) -> f64 { evaluate_diversity(samples) }
+    fn fluency(&self, text: &str) -> f64 { evaluate_fluency(text) }
+    fn rouge_l(&self, reference: &str, candidate: &str) -> f64 { evaluate_rouge_l(reference, candidate) }
+    fn fact_coverage(&self, facts: &[String], candidate: &str) -> f64 { evaluate_fact_coverage(facts, candidate) }
+    fn factcheck_adv(&self, facts: &[String], candidate: &str) -> f64 { evaluate_factcheck_adv_score(facts, candidate) }
+    fn plagiarism(&self, corpus: &[String], candidate: &str) -> f64 { evaluate_plagiarism(corpus, candidate) }
+    fn plagiarism_ngram(&self, corpus: &[String], candidate: &str, n: usize) -> f64 { evaluate_plagiarism_ngram(corpus, candidate, n) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

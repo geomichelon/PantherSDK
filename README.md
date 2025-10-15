@@ -79,7 +79,72 @@ Curl examples
            ]
          }' \
      http://localhost:8000/metrics/evaluate | jq`
-  - Resposta: `{ "score": 0.xx }` (0..1). Para corpus maiores, envie `samples` como lista.
+  - Resposta: `{ "score": 0.xx }` (0..1). Para corpus maiores, envie `samples` como lista. Opcional: `ngram` (inteiro > 0) para ajustar o n‑grama (padrão 3).
+  
+- Metrics — Fact-checking avançado com fontes:
+  - `curl -s -X POST \
+     -H 'Content-Type: application/json' \
+     -H 'X-API-Key: secret' \
+     -d '{
+           "metric": "factcheck_sources",
+           "text": "Insulin regulates glucose in the blood.",
+           "sources": [
+             {"id":"src1","text":"Insulin regulates glucose"},
+             {"id":"src2","text":"Vitamin C supports the immune system"}
+           ],
+           "top_k": 3,
+           "evidence_k": 2,
+           "method": "bow",  // jaccard|bow|embed
+           "contradiction_terms": ["contraindicated","avoid"]
+           // Classificação de contradições (NLI):
+           //  "contradiction_method": "nli"
+           //  Env vars para NLI (provider embutido):
+           //   - OpenAI: PANTHER_OPENAI_API_KEY, PANTHER_OPENAI_BASE (opcional), PANTHER_OPENAI_NLI_MODEL
+           //   - Ollama: PANTHER_OLLAMA_BASE, PANTHER_OLLAMA_NLI_MODEL
+         }' \
+     http://localhost:8000/metrics/evaluate | jq`
+  - Resposta: `{ "score": 0.xx, "coverage": 0.xx, "contradiction_rate": 0.xx, "top_sources": [...], "evidence": [...], "justification": "...", "contradiction_rate_nli": 0.xx, "nli": [...] }`.
+
+- Metrics — Bias avançado (com grupos customizáveis):
+  - `curl -s -X POST \
+     -H 'Content-Type: application/json' \
+     -H 'X-API-Key: secret' \
+     -d '{
+           "metric": "bias_adv",
+           "samples": ["He is a doctor.", "She is a nurse."],
+           "groups": {"male":["he","him","his"], "female":["she","her","hers"]},
+           "locale": "en"  // pt|en; define defaults quando groups não é informado
+         }' \
+     http://localhost:8000/metrics/evaluate | jq`
+  - Resposta: `{ "score": 0.xx, "group_counts": {...}, "per_sample": [...], "suggestions": [...] }`.
+
+- Metrics — Contextual relevance (domínio/idioma):
+  - `curl -s -X POST \
+     -H 'Content-Type: application/json' \
+     -H 'X-API-Key: secret' \
+     -d '{
+           "metric": "contextual_relevance",
+           "text": "Insulin regulates glucose in the blood. HbA1c is a long-term marker.",
+           "domain": "healthcare",
+           "locale": "en"
+         }' \
+     http://localhost:8000/metrics/evaluate | jq`
+  - Use `keywords_must`/`keywords_should` para customizar listas; sem elas, usa termos padrão por domínio/idioma.
+
+- Metrics — Guided rewrite (mitigação aprimorada):
+  - `curl -s -X POST \
+     -H 'Content-Type: application/json' \
+     -H 'X-API-Key: secret' \
+     -d '{
+           "metric": "bias_rewrite",
+           "text": "He is a doctor. She is a nurse.",
+           "domain": "healthcare",
+           "locale": "en",
+           "rewrite_method": "llm",  // rule|llm
+           "target_style": "neutral"
+         }' \
+     http://localhost:8000/metrics/evaluate | jq`
+  - Fallback rule-based neutralization when LLM credentials are not present. Audit (SQLite) saved in `rewrite_audit` quando DB ativo.
 
 - Proof compute (Stage 1, offline):
   - Primeiro execute uma validação (como acima) e capture `results` (array JSON).
@@ -236,7 +301,52 @@ AI Evaluation CLI (Batch)
   - Plagiarism metric (using JSONL corpus with {text}):
     - `panther-ai-eval --input samples/data/eval_sample.jsonl --providers samples/data/providers.example.json \
        --out outputs --metrics plagiarism --plag-corpus samples/data/rag_index.jsonl --plag-ngram 3`
-    - O corpus pode ser JSONL (cada linha string ou `{text}`), CSV (coluna `text|content`) ou diretório de `.txt`.
+    - O corpus pode ser JSONL (cada linha string ou `{text}`), CSV (coluna `text|content`) ou diretório de `.txt`. Opcional `--plag-ngram N` para ajustar o n‑grama.
+
+  - Multi‑prompt consistency (cenários):
+    - Estrutura: diretório com vários arquivos `.jsonl` ou `.csv` de prompts.
+    - `panther-ai-eval --scenarios samples/data/scenarios --providers providers.json --out outputs_scenarios`
+    - Geração por cenário em `outputs_scenarios/<scenario>/...` e agregação em `outputs_scenarios/consistency_multiprompt.csv` (por provider: n_scenarios, mean_of_means, std_of_means, cv_of_means).
+  - Relatório avançado (comparativos + custos):
+    - `panther-ai-eval --input samples/data/eval_sample.jsonl --providers providers.json --out outputs --costs costs.json --report-advanced-html`
+    - Gera `advanced_summary.csv` com mean/std/cv, p50/p95, tokens_in/out e custo estimado; e `advanced_report.html` com barras de score e custo relativo.
+  - Formato de `costs.json` (exemplos):
+    ```json
+    [
+      {"provider":"openai:gpt-4o-mini", "usd_per_1k_in": 0.005, "usd_per_1k_out": 0.015},
+      {"provider":"openai:", "usd_per_1k_in": 0.010, "usd_per_1k_out": 0.030},
+      {"provider":"*", "usd_per_1k_in": 0.000, "usd_per_1k_out": 0.000}
+    ]
+    ```
+  - API-backed metrics (chamando a API Python):
+    - Fact-check com fontes/NLI: `panther-ai-eval --input ... --providers providers.json --out outputs \
+       --api-base http://127.0.0.1:8000 --api-metric factcheck_sources --sources samples/data/rag_index.jsonl \
+       --api-method bow --top-k 3 --evidence-k 2 --contradiction-method nli`
+    - Contextual relevance: `panther-ai-eval --input ... --out outputs --api-base http://127.0.0.1:8000 \
+       --api-metric contextual_relevance --domain healthcare --locale en`
+    - Guided rewrite (LLM): `panther-ai-eval --input ... --out outputs --api-base http://127.0.0.1:8000 \
+       --api-metric bias_rewrite --domain healthcare --locale en --target-style neutral`
+    - Artefatos: `factcheck_results.jsonl`, `contextual_results.jsonl`, `rewrites_api.jsonl` em `--out`.
+  - Reescrita guiada (rule-based) no CLI:
+    - `panther-ai-eval --input samples/data/eval_sample.jsonl --providers providers.json --out outputs --rewrite --rewrite-style neutral --rewrite-locale en`
+    - Gera `rewrites.jsonl` com `{index,provider,style,locale,original,rewritten}` para o melhor output de cada prompt.
+  - Variações controladas de prompt (variants):
+    - Aplique estilos por prompt com `--variants short,detailed,bullets,formal,layman` (expande cada item em múltiplas variações)
+    - Ex.: `panther-ai-eval --input samples/data/eval_sample.jsonl --variants short,bullets --providers providers.json --out outputs_variants`
+
+CLI Modes — Local vs API-backed
+- Local (puro Rust):
+  - Validação multiprovider, `results.jsonl`/`summary.csv`.
+  - Consistência: `--variants`, `--scenarios` (+ `--scenarios-config`), `summary_consistency.csv`, `consistency_multiprompt.csv`, `consistency_report.html`.
+  - Plágio (Jaccard n-gram): `--metrics plagiarism --plag-corpus --plag-ngram`.
+  - Relatório avançado + custos: `--costs costs.json --report-advanced-html` (gera `advanced_summary.csv` e `advanced_report.html`).
+  - Reescrita guiada (rule-based): `--rewrite --rewrite-style ... --rewrite-locale ...` (gera `rewrites.jsonl`).
+
+- API-backed (requer `--api-base` apontando para a API Python):
+  - Fact-check com fontes (incl. NLI, thresholds por fonte, ranking/auditoria): `--api-metric factcheck_sources` + `--sources ...` (+ flags `--api-method`, `--contradiction-method`, `--top-k`, `--evidence-k`, `--source-thresholds`). Artefato: `factcheck_results.jsonl`.
+  - Contextual relevance (domínio/idioma): `--api-metric contextual_relevance` + `--domain/--locale` (+ `--keywords-must/--keywords-should`). Artefato: `contextual_results.jsonl`.
+  - Guided rewrite (LLM): `--api-metric bias_rewrite` + `--domain/--locale/--target-style`. Artefato: `rewrites_api.jsonl`.
+  - Use `--api-key` se a API exigir `X-API-Key`.
 
 Example results.jsonl (excerpt)
 ```

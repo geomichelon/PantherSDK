@@ -12,6 +12,7 @@ members = [
     "crates/panther-sandbox",
     "crates/panther-ai-eval",
     "crates/panther-agents",
+    "crates/panther-metrics-content",
     "panthersdk",
     "crates/panther-validation",
 ]

@@ -1,76 +1,10 @@
-from fastapi import FastAPI, Depends, Header, HTTPException, Response
-import sys
-import platform
-import sqlite3
-import threading
-from pydantic import BaseModel
-import json
-import os
-import ctypes
-from ctypes import c_char_p
-import time
-
-# Prometheus (optional)
-try:
-    from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-    _PROM_ENABLED = True
-    MET_ANCHOR_REQ = Counter("panther_anchor_requests_total", "Total anchor requests")
-    MET_ANCHOR_OK = Counter("panther_anchor_success_total", "Total successful anchor operations")
-    MET_ANCHOR_LAT = Histogram("panther_anchor_latency_seconds", "Anchor latency (seconds)")
-    MET_STATUS_REQ = Counter("panther_status_checks_total", "Total status check requests")
-except Exception:
-    _PROM_ENABLED = False
-
-try:
-    import pantherpy  # PyO3 module built with maturin
-    _HAS_PYO3 = True
-except Exception:
-    pantherpy = None
-    _HAS_PYO3 = False
-
-
-class GenerateRequest(BaseModel):
-    prompt: str
-
-
-class EvaluateRequest(BaseModel):
-    metric: str
-    expected: str | None = None
-    generated: str | None = None
-    reference: str | None = None
-    candidate: str | None = None
-    text: str | None = None
-    samples: list[str] | None = None
-
-
-class BiasRequest(BaseModel):
-    samples: list[str]
-
-
-class ProviderConfig(BaseModel):
-    type: str  # "openai" | "ollama"
-    base_url: str | None = None
-    model: str | None = None
-    api_key: str | None = None
-
-
-class ValidateRequest(BaseModel):
-    prompt: str
-    providers: list[ProviderConfig]
-    guidelines_json: str | None = None
-
-class ProofRequest(BaseModel):
-    prompt: str
-    providers: list[ProviderConfig]
-    results: list[dict]
-    guidelines_json: str | None = None
-    salt: str | None = None
-
-
-class AgentRunRequest(BaseModel):
-    plan: dict | None = None
-    input: dict
-    async_run: bool | None = False
+from fastapi import FastAPI
+from .core import init_db
+from .routes import health as health_router
+from .routes import validation as validation_router
+from .routes import metrics as metrics_router
+from .routes import proof as proof_router
+from .routes import agents as agents_router
 
 
 def _lib_names_for_platform() -> list[str]:
@@ -280,32 +214,12 @@ def _auth_guard(x_api_key: str | None = Header(default=None)):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="PantherSDK API")
-    # Initialize optional SQLite DB
-    _init_db()
-
-    @app.get("/health")
-    def health():
-        return {"status": "ok", "rust": bool(_RUST or _HAS_PYO3), "pyo3": _HAS_PYO3}
-
-    @app.post("/v1/generate")
-    def generate(req: GenerateRequest, _auth=Depends(_auth_guard)):
-        if _HAS_PYO3:
-            try:
-                if hasattr(pantherpy, "init"):
-                    # safe to call multiple times; OnceCell guards in Rust
-                    pantherpy.init()
-                return pantherpy.generate(req.prompt)
-            except Exception as e:
-                return {"error": str(e)}
-        if _RUST:
-            s = _RUST.panther_generate(req.prompt.encode("utf-8"))
-            try:
-                data = ctypes.cast(s, c_char_p).value.decode("utf-8")
-                return json.loads(data)
-            finally:
-                _RUST.panther_free_string(s)
-        # Fallback (dev mode)
-        return {"text": f"echo: {req.prompt}", "model": "python-fallback"}
+    init_db()
+    app.include_router(health_router.router)
+    app.include_router(validation_router.router)
+    app.include_router(metrics_router.router)
+    app.include_router(proof_router.router)
+    app.include_router(agents_router.router)
 
     @app.post("/metrics/evaluate")
     def metrics_evaluate(req: EvaluateRequest, _auth=Depends(_auth_guard)):
@@ -576,151 +490,12 @@ def create_app() -> FastAPI:
             "salt_present": bool(req.salt),
         }
 
-    # --- Agents (Stage 6) ---
-    _AGENT_RUNS: dict[str, dict] = {}
-    _AGENT_LOCK = threading.Lock()
-
-    def _gen_run_id() -> str:
-        return f"r{int(time.time()*1000)}-{os.getpid()}"
-
-    @app.post("/agent/run")
-    def agent_run(req: AgentRunRequest, _auth=Depends(_auth_guard)):
-        plan = req.plan or {"type": "ValidateSealAnchor"}
-        input_obj = req.input
-        run_id = _gen_run_id()
-
-        def _exec_and_store():
-            try:
-                plan_s = json.dumps(plan)
-                input_s = json.dumps(input_obj)
-                if _RUST and hasattr(_RUST, "panther_agent_run"):
-                    s = _RUST.panther_agent_run(plan_s.encode("utf-8"), input_s.encode("utf-8"))
-                    try:
-                        data = ctypes.cast(s, c_char_p).value.decode("utf-8")
-                        out = json.loads(data)
-                    finally:
-                        _RUST.panther_free_string(s)
-                else:
-                    out = {"error": "agents FFI unavailable"}
-            except Exception as e:
-                out = {"error": str(e)}
-            with _AGENT_LOCK:
-                st = _AGENT_RUNS.get(run_id, {"status": "running", "events": []})
-                st["status"] = "done"
-                st["result"] = out
-                try:
-                    st["events"] = list(out.get("events", []))
-                except Exception:
-                    pass
-                _AGENT_RUNS[run_id] = st
-
-        with _AGENT_LOCK:
-            _AGENT_RUNS[run_id] = {"status": "running", "events": []}
-        # Persist start if DB available
-        try:
-            if _DB is not None:
-                with _DB_LOCK:
-                    _DB.execute(
-                        "INSERT OR REPLACE INTO agent_runs(run_id,status,started_ts) VALUES(?,?,?)",
-                        (run_id, "running", int(time.time()*1000)),
-                    )
-                    _DB.commit()
-        except Exception:
-            pass
-
-        if req.async_run:
-            th = threading.Thread(target=_exec_and_store, daemon=True)
-            th.start()
-            return {"run_id": run_id, "status": "running"}
-        else:
-            _exec_and_store()
-            with _AGENT_LOCK:
-                out = {"run_id": run_id, **_AGENT_RUNS.get(run_id, {})}
-            # Persist finish if DB available
-            try:
-                if _DB is not None:
-                    with _DB_LOCK:
-                        st = _AGENT_RUNS.get(run_id, {})
-                        _DB.execute(
-                            "UPDATE agent_runs SET status=?, finished_ts=?, result_json=?, events_json=? WHERE run_id=?",
-                            (
-                                st.get("status"),
-                                int(time.time()*1000),
-                                json.dumps(st.get("result")),
-                                json.dumps(st.get("events", [])),
-                                run_id,
-                            ),
-                        )
-                        _DB.commit()
-            except Exception:
-                pass
-            return out
-
-    @app.get("/agent/status")
-    def agent_status(run_id: str, _auth=Depends(_auth_guard)):
-        with _AGENT_LOCK:
-            st = _AGENT_RUNS.get(run_id)
-        if st:
-            return {"run_id": run_id, "status": st.get("status"), "done": st.get("status") == "done"}
-        # Fallback to DB if not in memory
-        if _DB is not None:
-            try:
-                with _DB_LOCK:
-                    cur = _DB.execute("SELECT status, finished_ts FROM agent_runs WHERE run_id=?", (run_id,))
-                    row = cur.fetchone()
-                    if not row:
-                        raise HTTPException(status_code=404, detail="run not found")
-                    status, finished_ts = row
-                    return {"run_id": run_id, "status": status, "done": bool(finished_ts)}
-            except HTTPException:
-                raise
-            except Exception as e:
-                return {"error": str(e)}
-        raise HTTPException(status_code=404, detail="run not found")
-
-    @app.get("/agent/events")
-    def agent_events(run_id: str, _auth=Depends(_auth_guard)):
-        with _AGENT_LOCK:
-            st = _AGENT_RUNS.get(run_id)
-            if st:
-                return {"run_id": run_id, "events": st.get("events", [])}
-        if _DB is not None:
-            try:
-                with _DB_LOCK:
-                    cur = _DB.execute("SELECT events_json FROM agent_runs WHERE run_id=?", (run_id,))
-                    row = cur.fetchone()
-                    if not row:
-                        raise HTTPException(status_code=404, detail="run not found")
-                    events_json = row[0] or "[]"
-                    return {"run_id": run_id, "events": json.loads(events_json)}
-            except HTTPException:
-                raise
-            except Exception as e:
-                return {"error": str(e)}
-        raise HTTPException(status_code=404, detail="run not found")
-
-    @app.get("/agent/events/stream")
-    def agent_events_stream(run_id: str, _auth=Depends(_auth_guard)):
-        # Incremental SSE: streams events as they arrive
-        import time as _t
-        from fastapi.responses import StreamingResponse
-
-        def _gen():
-            cursor = 0
-            while True:
-                # poll for new events
-                try:
-                    res = agent_poll(run_id, cursor)
-                    for ev in res.get("events", []):
-                        yield f"data: {json.dumps(ev)}\n\n".encode()
-                    cursor = int(res.get("cursor", cursor))
-                    if res.get("done"):
-                        break
-                except Exception:
-                    pass
-                yield b"event: ping\n\n"
-                _t.sleep(0.2)
-        return StreamingResponse(_gen(), media_type="text/event-stream")
+    # Include agents router
+    try:
+        from .routes import agents as agents_router
+        app.include_router(agents_router.router)
+    except Exception:
+        pass
 
     @app.get("/audit/logs")
     def audit_logs(_auth=Depends(_auth_guard)):
@@ -935,26 +710,3 @@ feature/ProofSeal
             return {"error": str(e)}
 
     return app
-    @app.post("/agent/start")
-    def agent_start(req: AgentRunRequest, _auth=Depends(_auth_guard)):
-        plan = req.plan or {"type": "ValidateSealAnchor"}
-        input_obj = req.input
-        if _RUST and hasattr(_RUST, "panther_agent_start"):
-            s = _RUST.panther_agent_start(json.dumps(plan).encode("utf-8"), json.dumps(input_obj).encode("utf-8"))
-            try:
-                data = ctypes.cast(s, c_char_p).value.decode("utf-8")
-                return json.loads(data)
-            finally:
-                _RUST.panther_free_string(s)
-        return {"error": "agents FFI unavailable"}
-
-    @app.get("/agent/poll")
-    def agent_poll(run_id: str, cursor: int = 0, _auth=Depends(_auth_guard)):
-        if _RUST and hasattr(_RUST, "panther_agent_poll"):
-            s = _RUST.panther_agent_poll(run_id.encode("utf-8"), str(cursor).encode("utf-8"))
-            try:
-                data = ctypes.cast(s, c_char_p).value.decode("utf-8")
-                return json.loads(data)
-            finally:
-                _RUST.panther_free_string(s)
-        return {"error": "agents FFI unavailable"}

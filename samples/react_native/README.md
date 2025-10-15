@@ -13,6 +13,11 @@ API exposed by native module `PantherModule`:
 - `validateMultiWithProof(prompt, providersJson)` -> `{ results, proof }` (Stage 1)
 - `version()` -> SDK version string
 
+Agents helpers (HTTP, Stage 6) in `Panther.ts`:
+- `runAgent(plan, input, apiBase?, apiKey?, asyncRun=true)` -> `{ run_id, status? } | { result }`
+- `getAgentStatus(runId, apiBase?, apiKey?)` -> `{ run_id, status, done }`
+- `getAgentEvents(runId, apiBase?, apiKey?)` -> `{ run_id, events: [...] }`
+
 What this sample does
 - Record Metric: calls `panther_metrics_record` through native module
 - List Items: returns metric names via `panther_storage_list_metrics`
@@ -51,7 +56,7 @@ Example UI (AppSample.tsx)
   - Prompt field
   - Providers JSON field (defaults to OpenAI‑compatible entry)
   - Backend API Base + API Key inputs
-  - Buttons: Validate (calls `validateMultiWithProof`) and Anchor Proof (calls `/proof/anchor` on your API)
+  - Buttons: Validate (calls `validateMultiWithProof`) and Anchor Proof (calls `/proof/anchor` on your API). You can also wire a button to `runAgent({type:'ValidateSealAnchor'}, {prompt, providers})` and poll status+events.
 - To try it quickly:
   1) Make sure `PantherModule` is wired per the steps above for your RN project.
   2) Copy `Panther.ts` and `AppSample.tsx` into your RN app (e.g., `src/`).

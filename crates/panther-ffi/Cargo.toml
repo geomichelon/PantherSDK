@@ -19,6 +19,7 @@ panther-core = { path = "../panther-core" }
 panther-providers = { path = "../panther-providers" }
 panther-observability = { path = "../panther-observability" }
 panthersdk = { path = "../../panthersdk" }
+panther-agents = { path = "../panther-agents", optional = true }
 
 [features]
 default = []
@@ -31,10 +32,15 @@ observability = []
 validation = ["dep:panther-validation"]
 validation-openai = ["validation", "panther-validation/openai"]
 validation-ollama = ["validation", "panther-validation/ollama"]
-blockchain-eth = ["validation", "panther-validation/blockchain-eth"]
+blockchain-eth = ["validation", "panther-validation/blockchain-eth", "panther-agents/blockchain-eth"]
 validation-async = ["validation"]
 validation-openai-async = ["validation-async", "panther-validation/openai-async", "panther-providers/openai-async"]
 validation-ollama-async = ["validation-async", "panther-validation/ollama-async", "panther-providers/ollama-async"]
+agents = ["dep:panther-agents"]
+agents-openai = ["agents", "panther-agents/validation-openai"]
+agents-ollama = ["agents", "panther-agents/validation-ollama"]
+agents-openai-async = ["agents", "panther-agents/validation-openai-async"]
+agents-ollama-async = ["agents", "panther-agents/validation-ollama-async"]
 
 [dependencies.panther-metrics]
 path = "../panther-metrics"

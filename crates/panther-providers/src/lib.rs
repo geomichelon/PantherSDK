@@ -1,5 +1,7 @@
 use panther_domain::entities::{Completion, Prompt};
-use panther_domain::ports::{LlmProvider, LlmProviderAsync};
+use panther_domain::ports::LlmProvider;
+#[cfg(any(feature = "openai-async", feature = "ollama-async"))]
+use panther_domain::ports::LlmProviderAsync;
 
 pub struct NullProvider;
 

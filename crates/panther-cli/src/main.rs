@@ -90,7 +90,7 @@ async fn main() -> Result<()> {
                 let mut lats: Vec<i64> = results.iter().map(|r| r.latency_ms).collect();
                 lats.sort();
                 let idx = |p: f64| -> usize {
-                    if lats.is_empty() { 0 } else { ((p * (lats.len() as f64 - 1.0)).round() as isize).clamp(0, (lats.len() as isize - 1)) as usize }
+                    if lats.is_empty() { 0 } else { ((p * (lats.len() as f64 - 1.0)).round() as isize).clamp(0, lats.len() as isize - 1) as usize }
                 };
                 let p50 = lats[idx(0.50)];
                 let p95 = lats[idx(0.95)];

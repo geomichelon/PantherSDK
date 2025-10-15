@@ -13,6 +13,7 @@ clap = { version = "4.5", features = ["derive"] }
 csv = "1"
 panther-providers = { path = "../panther-providers" }
 panther-domain = { path = "../panther-domain" }
+panthersdk = { path = "../../panthersdk" }
 
 [features]
 default = ["openai", "ollama"]

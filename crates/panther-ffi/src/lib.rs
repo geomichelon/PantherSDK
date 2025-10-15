@@ -122,6 +122,24 @@ pub extern "C" fn panther_metrics_fact_coverage(facts_json: *const c_char, candi
 }
 
 #[no_mangle]
+pub extern "C" fn panther_metrics_factcheck_adv(facts_json: *const c_char, candidate: *const c_char) -> f64 {
+    let facts_s = unsafe { CStr::from_ptr(facts_json).to_string_lossy().into_owned() };
+    let cand = unsafe { CStr::from_ptr(candidate).to_string_lossy().into_owned() };
+    let facts: Vec<String> = serde_json::from_str(&facts_s).unwrap_or_default();
+    if let Some(buf) = LOGS.get() { let _ = buf.lock().map(|mut v| v.push("metrics_factcheck_adv".to_string())); }
+    panthersdk::domain::metrics::evaluate_factcheck_adv(&facts, &cand)
+}
+
+#[no_mangle]
+pub extern "C" fn panther_metrics_plagiarism(corpus_json: *const c_char, candidate: *const c_char) -> f64 {
+    let corpus_s = unsafe { CStr::from_ptr(corpus_json).to_string_lossy().into_owned() };
+    let cand = unsafe { CStr::from_ptr(candidate).to_string_lossy().into_owned() };
+    let corpus: Vec<String> = serde_json::from_str(&corpus_s).unwrap_or_default();
+    if let Some(buf) = LOGS.get() { let _ = buf.lock().map(|mut v| v.push("metrics_plagiarism".to_string())); }
+    panthersdk::domain::metrics::evaluate_plagiarism(&corpus, &cand)
+}
+
+#[no_mangle]
 pub extern "C" fn panther_metrics_record(name: *const c_char, value: f64) -> i32 {
     if let Some(engine) = ENGINE.get() {
         let nm = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
@@ -269,8 +287,8 @@ pub extern "C" fn panther_agent_poll(run_id_c: *const c_char, cursor_c: *const c
     let cursor_s = unsafe { CStr::from_ptr(cursor_c).to_string_lossy().into_owned() };
     let cursor = cursor_s.parse::<usize>().unwrap_or(0);
     match panther_agents::agent_poll(&run_id, cursor) {
-        Ok((events, done, new_cursor)) => {
-            let out = serde_json::json!({"events": events, "done": done, "cursor": new_cursor});
+        Ok((events, done, new_cursor, status)) => {
+            let out = serde_json::json!({"events": events, "done": done, "cursor": new_cursor, "status": status});
             rust_string_to_c(out.to_string())
         }
         Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),

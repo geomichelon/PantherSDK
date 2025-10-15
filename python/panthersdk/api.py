@@ -118,6 +118,16 @@ def _load_rust_lib():
                     lib.panther_metrics_fact_coverage.restype = ctypes.c_double
                 except Exception:
                     pass
+                try:
+                    lib.panther_metrics_factcheck_adv.argtypes = [c_char_p, c_char_p]
+                    lib.panther_metrics_factcheck_adv.restype = ctypes.c_double
+                except Exception:
+                    pass
+                try:
+                    lib.panther_metrics_plagiarism.argtypes = [c_char_p, c_char_p]
+                    lib.panther_metrics_plagiarism.restype = ctypes.c_double
+                except Exception:
+                    pass
                 if lib.panther_init() == 0:
                     return lib
             except Exception:

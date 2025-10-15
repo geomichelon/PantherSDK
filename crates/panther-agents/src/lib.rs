@@ -354,18 +354,19 @@ pub fn agent_start(plan_json: &str, input_json: &str) -> Result<String> {
     Ok(run_id)
 }
 
-pub fn agent_poll(run_id: &str, cursor: usize) -> Result<(Vec<AgentEvent>, bool, usize)> {
-    let (events, done);
+pub fn agent_poll(run_id: &str, cursor: usize) -> Result<(Vec<AgentEvent>, bool, usize, String)> {
+    let (events, done, status);
     {
         let map = runs().lock().unwrap();
         let st = map.get(run_id).ok_or_else(|| anyhow::anyhow!("run not found"))?;
         let total = st.events.len();
         let from = cursor.min(total);
         events = st.events[from..].to_vec();
-        done = st.status == "done";
+        status = st.status.clone();
+        done = status == "done";
     }
     let new_cursor = cursor + events.len();
-    Ok((events, done, new_cursor))
+    Ok((events, done, new_cursor, status))
 }
 
 pub fn agent_status(run_id: &str) -> Result<(String, bool)> {

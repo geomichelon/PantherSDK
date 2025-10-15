@@ -153,6 +153,17 @@ def _load_rust_lib():
                 except Exception:
                     pass
                 lib.panther_free_string.argtypes = [c_char_p]
+                # new metrics
+                try:
+                    lib.panther_metrics_rouge_l.argtypes = [c_char_p, c_char_p]
+                    lib.panther_metrics_rouge_l.restype = ctypes.c_double
+                except Exception:
+                    pass
+                try:
+                    lib.panther_metrics_fact_coverage.argtypes = [c_char_p, c_char_p]
+                    lib.panther_metrics_fact_coverage.restype = ctypes.c_double
+                except Exception:
+                    pass
                 if lib.panther_init() == 0:
                     return lib
             except Exception:
@@ -321,6 +332,29 @@ def create_app() -> FastAPI:
             vowels = set("aeiouAEIOU")
             good = sum(1 for t in toks if any(ch in vowels for ch in t))
             return {"score": good / len(toks)}
+        if m == "rouge" and req.reference and req.candidate:
+            if _RUST and hasattr(_RUST, "panther_metrics_rouge_l"):
+                s = _RUST.panther_metrics_rouge_l(req.reference.encode("utf-8"), req.candidate.encode("utf-8"))
+                return {"score": float(s)}
+            # Python fallback (simple LCS)
+            def _tok(s: str) -> list[str]: return s.split()
+            r = _tok(req.reference); c = _tok(req.candidate)
+            if not r or not c: return {"score": 0.0}
+            n, m = len(r), len(c)
+            dp = [[0]*(m+1) for _ in range(n+1)]
+            for i in range(n):
+                for j in range(m):
+                    dp[i+1][j+1] = dp[i][j]+1 if r[i]==c[j] else max(dp[i+1][j], dp[i][j+1])
+            lcs = dp[n][m]
+            p = lcs/len(c); rc = lcs/len(r); s = (2*p*rc)/(p+rc) if p+rc else 0.0
+            return {"score": s}
+        if m == "factcheck" and req.text is not None and req.samples is not None:
+            facts = req.samples
+            if _RUST and hasattr(_RUST, "panther_metrics_fact_coverage"):
+                s = _RUST.panther_metrics_fact_coverage(json.dumps(facts).encode("utf-8"), req.text.encode("utf-8"))
+                return {"score": float(s)}
+            low = req.text.lower(); hits = sum(1 for f in facts if f and f.lower() in low); tot = max(1,len(facts))
+            return {"score": hits / tot}
         return {"error": "unsupported or missing fields"}
 
     @app.get("/metrics/history")

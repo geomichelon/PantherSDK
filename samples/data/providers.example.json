@@ -1,0 +1,13 @@
+[
+  {
+    "type": "openai",
+    "api_key": "sk-REPLACE_ME",
+    "base_url": "https://api.openai.com",
+    "model": "gpt-4o-mini"
+  },
+  {
+    "type": "ollama",
+    "base_url": "http://127.0.0.1:11434",
+    "model": "llama3"
+  }
+]

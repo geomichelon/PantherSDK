@@ -1,6 +1,14 @@
 import React, {useEffect, useState} from 'react';
-import {View, Text, TextInput, Button, ScrollView, Platform, StyleSheet, Linking} from 'react-native';
-import {init, validateMultiWithProof, anchorProof, runAgent, getAgentStatus, getAgentEvents} from './Panther';
+import {View, Text, TextInput, Button, ScrollView, Platform, StyleSheet, Linking, Switch} from 'react-native';
+// Try to load EventSource implementation for RN (optional)
+let RNEventSource: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  RNEventSource = require('react-native-event-source').default || require('react-native-event-source');
+} catch (_) {
+  RNEventSource = null;
+}
+import {init, validateMultiWithProof, anchorProof, startAgent, pollAgent} from './Panther';
 
 export default function AppSample() {
   const [prompt, setPrompt] = useState('Explain insulin function');
@@ -31,6 +39,7 @@ export default function AppSample() {
   const [runId, setRunId] = useState<string | null>(null);
   const [agentStatus, setAgentStatus] = useState<string | null>(null);
   const [agentEvents, setAgentEvents] = useState<string[]>([]);
+  const [useSSE, setUseSSE] = useState<boolean>(false);
 
   useEffect(() => {
     init().catch(() => undefined);
@@ -96,26 +105,55 @@ export default function AppSample() {
       try { providers = JSON.parse(providersJson); } catch { providers = []; }
       const plan = { type: 'ValidateSealAnchor' } as any;
       const input = { prompt, providers } as any;
-      const res = await runAgent(plan, input, apiBase, apiKey || undefined, true);
-      if ((res as any).error) {
+      const res = await startAgent(plan, input, apiBase, apiKey || undefined);
+      if ((res as any).error || !(res as any).run_id) {
         setAgentStatus(`error: ${(res as any).error}`);
         return;
       }
       const id = (res as any).run_id as string;
-      if (!id) {
-        setAgentStatus('error: no run_id');
-        return;
-      }
       setRunId(id);
-      // poll for completion
-      for (let i = 0; i < 200; i++) {
-        const st = await getAgentStatus(id, apiBase, apiKey || undefined);
-        setAgentStatus(st.status);
-        if (st.done) break;
-        await new Promise(r => setTimeout(r, 300));
+      const base = apiBase || (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+      // Try SSE when toggled and no API key is required (EventSource doesn't support custom headers)
+      const ES: any = RNEventSource || (global as any).EventSource;
+      if (useSSE && ES && !apiKey) {
+        try {
+          const events: any[] = [];
+          const es = new ES(`${base}/agent/events/stream?run_id=${encodeURIComponent(id)}`);
+          es.onmessage = (msg: any) => {
+            try {
+              const ev = JSON.parse(msg.data);
+              events.push(ev);
+              const evLines = events.map((e: any) => `${new Date(e.ts||0).toLocaleTimeString()} [${e.stage}] ${e.message}`);
+              setAgentEvents(evLines);
+              setAgentStatus('running');
+            } catch {}
+          };
+          es.onerror = () => { try { es.close(); } catch {} setAgentStatus('done'); };
+          return;
+        } catch {
+          // fallback to polling
+        }
       }
-      const ev = await getAgentEvents(id, apiBase, apiKey || undefined);
-      const events = (ev as any).events || [];
+      // incremental polling
+      let cursor = 0;
+      let done = false;
+      const events: any[] = [];
+      for (let i = 0; i < 600; i++) {
+        const pol = await pollAgent(id, cursor, apiBase, apiKey || undefined);
+        if ((pol as any).error) break;
+        const newEvs = pol.events || [];
+        for (const ev of newEvs) {
+          events.push(ev);
+        }
+        cursor = pol.cursor || cursor;
+        done = !!pol.done;
+        setAgentStatus(done ? 'done' : 'running');
+        // Update UI incrementally
+        const evLines = events.map((e: any) => `${new Date(e.ts||0).toLocaleTimeString()} [${e.stage}] ${e.message}`);
+        setAgentEvents(evLines);
+        if (done) break;
+        await new Promise(r => setTimeout(r, 200));
+      }
       const lines: string[] = [];
       // Extract validation summary
       const v = events.find((e: any) => e.stage === 'validate' && (e.message || '').includes('complete'));
@@ -129,9 +167,6 @@ export default function AppSample() {
       const s = events.find((e: any) => e.stage === 'seal');
       const hash = s && s.data && (s.data.combined_hash || (s.data.proof && s.data.proof.combined_hash));
       if (hash) setProof(hash);
-      // Human-readable events
-      const evLines = events.map((e: any) => `${new Date(e.ts||0).toLocaleTimeString()} [${e.stage}] ${e.message}`);
-      setAgentEvents(evLines);
     } catch (e: any) {
       setAgentStatus(`error: ${String(e?.message || e)}`);
     }
@@ -173,6 +208,10 @@ export default function AppSample() {
       <View style={styles.row}>
         <Button title="Run Agent" onPress={runAgentFlow} />
         {runId ? <Text style={{marginLeft: 12}}>Run: {runId}</Text> : null}
+      </View>
+      <View style={[styles.row, {marginTop: 8}]}> 
+        <Text>Use SSE</Text>
+        <Switch value={useSSE} onValueChange={setUseSSE} style={{marginLeft: 8}} />
       </View>
 
       {proof ? <Text style={styles.proof}>Proof: {proof}</Text> : null}

@@ -2042,6 +2042,7 @@ name = "panther-agents"
 version = "0.1.2"
 dependencies = [
  "anyhow",
+ "once_cell",
  "panther-domain",
  "panther-providers",
  "panther-validation",

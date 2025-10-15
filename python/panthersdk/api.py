@@ -144,6 +144,26 @@ def _load_rust_lib():
                 except Exception:
                     pass
                 try:
+                    lib.panther_agent_start.argtypes = [c_char_p, c_char_p]
+                    lib.panther_agent_start.restype = c_char_p
+                except Exception:
+                    pass
+                try:
+                    lib.panther_agent_poll.argtypes = [c_char_p, c_char_p]
+                    lib.panther_agent_poll.restype = c_char_p
+                except Exception:
+                    pass
+                try:
+                    lib.panther_agent_status.argtypes = [c_char_p]
+                    lib.panther_agent_status.restype = c_char_p
+                except Exception:
+                    pass
+                try:
+                    lib.panther_agent_result.argtypes = [c_char_p]
+                    lib.panther_agent_result.restype = c_char_p
+                except Exception:
+                    pass
+                try:
                     lib.panther_proof_verify_local.argtypes = [c_char_p, c_char_p, c_char_p, c_char_p, c_char_p, c_char_p]
                     lib.panther_proof_verify_local.restype = ctypes.c_int
                 except Exception:
@@ -408,8 +428,10 @@ def create_app() -> FastAPI:
         MET_VAL_ERR = Counter('panther_validation_errors_total', 'Total validation errors')
         MET_VAL_ERR_L = Counter('panther_validation_errors_labeled_total', 'Validation errors by provider/category', ['provider','category'])
         MET_VAL_LAT = Histogram('panther_validation_latency_seconds', 'Validation latency (seconds)')
+        MET_VAL_LAT_P = Histogram('panther_validation_provider_latency_seconds', 'Validation latency by provider (seconds)', ['provider'])
+        MET_VAL_ERR_P = Counter('panther_validation_provider_errors_total', 'Validation errors by provider', ['provider'])
     except Exception:
-        MET_VAL_REQ = MET_VAL_ERR = MET_VAL_LAT = MET_VAL_ERR_L = None  # type: ignore
+        MET_VAL_REQ = MET_VAL_ERR = MET_VAL_LAT = MET_VAL_ERR_L = MET_VAL_LAT_P = MET_VAL_ERR_P = None  # type: ignore
 
     @app.post("/validation/run_multi")
     def validation_run_multi(req: ValidateRequest, _auth=Depends(_auth_guard)):
@@ -467,6 +489,18 @@ def create_app() -> FastAPI:
                                             MET_VAL_ERR_L.labels(r.get('provider_name','unknown'), cat).inc()
                                         except Exception:
                                             MET_VAL_ERR_L.labels(r.get('provider_name','unknown'), 'unknown').inc()
+                                    if MET_VAL_ERR_P:
+                                        try:
+                                            MET_VAL_ERR_P.labels(r.get('provider_name','unknown')).inc()
+                                        except Exception:
+                                            pass
+                                # latency by provider
+                                if MET_VAL_LAT_P:
+                                    try:
+                                        lat = float(r.get('latency_ms', 0)) / 1000.0
+                                        MET_VAL_LAT_P.labels(r.get('provider_name','unknown')).observe(max(0.0, lat))
+                                    except Exception:
+                                        pass
                         if MET_VAL_ERR and errc > 0:
                             MET_VAL_ERR.inc(errc)
                     except Exception:
@@ -667,23 +701,25 @@ def create_app() -> FastAPI:
 
     @app.get("/agent/events/stream")
     def agent_events_stream(run_id: str, _auth=Depends(_auth_guard)):
-        # Minimal SSE: waits until run finishes, then streams events and closes
+        # Incremental SSE: streams events as they arrive
         import time as _t
         from fastapi.responses import StreamingResponse
 
         def _gen():
-            # Poll status until done
-            for _ in range(600):  # up to ~60s
-                st = agent_status(run_id)
-                if st.get("done"):
-                    break
-                yield "event: ping\n".encode()
-                yield f"data: {json.dumps({'run_id': run_id, 'status': st.get('status')})}\n\n".encode()
-                _t.sleep(0.1)
-            # Send events in batch
-            evs = agent_events(run_id).get("events", [])
-            for ev in evs:
-                yield f"data: {json.dumps(ev)}\n\n".encode()
+            cursor = 0
+            while True:
+                # poll for new events
+                try:
+                    res = agent_poll(run_id, cursor)
+                    for ev in res.get("events", []):
+                        yield f"data: {json.dumps(ev)}\n\n".encode()
+                    cursor = int(res.get("cursor", cursor))
+                    if res.get("done"):
+                        break
+                except Exception:
+                    pass
+                yield b"event: ping\n\n"
+                _t.sleep(0.2)
         return StreamingResponse(_gen(), media_type="text/event-stream")
 
     @app.get("/audit/logs")
@@ -899,3 +935,26 @@ feature/ProofSeal
             return {"error": str(e)}
 
     return app
+    @app.post("/agent/start")
+    def agent_start(req: AgentRunRequest, _auth=Depends(_auth_guard)):
+        plan = req.plan or {"type": "ValidateSealAnchor"}
+        input_obj = req.input
+        if _RUST and hasattr(_RUST, "panther_agent_start"):
+            s = _RUST.panther_agent_start(json.dumps(plan).encode("utf-8"), json.dumps(input_obj).encode("utf-8"))
+            try:
+                data = ctypes.cast(s, c_char_p).value.decode("utf-8")
+                return json.loads(data)
+            finally:
+                _RUST.panther_free_string(s)
+        return {"error": "agents FFI unavailable"}
+
+    @app.get("/agent/poll")
+    def agent_poll(run_id: str, cursor: int = 0, _auth=Depends(_auth_guard)):
+        if _RUST and hasattr(_RUST, "panther_agent_poll"):
+            s = _RUST.panther_agent_poll(run_id.encode("utf-8"), str(cursor).encode("utf-8"))
+            try:
+                data = ctypes.cast(s, c_char_p).value.decode("utf-8")
+                return json.loads(data)
+            finally:
+                _RUST.panther_free_string(s)
+        return {"error": "agents FFI unavailable"}

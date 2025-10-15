@@ -17,6 +17,8 @@ Agents helpers (HTTP, Stage 6) in `Panther.ts`:
 - `runAgent(plan, input, apiBase?, apiKey?, asyncRun=true)` -> `{ run_id, status? } | { result }`
 - `getAgentStatus(runId, apiBase?, apiKey?)` -> `{ run_id, status, done }`
 - `getAgentEvents(runId, apiBase?, apiKey?)` -> `{ run_id, events: [...] }`
+ - `startAgent(plan, input, apiBase?, apiKey?)` -> `{ run_id }`
+ - `pollAgent(runId, cursor, apiBase?, apiKey?)` -> `{ events, cursor, done }`
 
 What this sample does
 - Record Metric: calls `panther_metrics_record` through native module
@@ -56,7 +58,12 @@ Example UI (AppSample.tsx)
   - Prompt field
   - Providers JSON field (defaults to OpenAI‑compatible entry)
   - Backend API Base + API Key inputs
-  - Buttons: Validate (calls `validateMultiWithProof`) and Anchor Proof (calls `/proof/anchor` on your API). You can also wire a button to `runAgent({type:'ValidateSealAnchor'}, {prompt, providers})` and poll status+events.
+  - Buttons: Validate (calls `validateMultiWithProof`) and Anchor Proof (calls `/proof/anchor` on your API). You can also wire um botão para `startAgent({type:'ValidateSealAnchor'}, {prompt, providers})` e alternar entre SSE e polling com o toggle “Use SSE”.
+
+SSE in React Native (optional)
+- Install: `npm i react-native-event-source` (or `yarn add react-native-event-source`)
+- The sample attempts to require it and falls back to `global.EventSource` if available.
+- If your backend requires custom headers (e.g., `X-API-Key`), use the polling fallback (`/agent/poll`), as EventSource doesn’t support custom headers.
 - To try it quickly:
   1) Make sure `PantherModule` is wired per the steps above for your RN project.
   2) Copy `Panther.ts` and `AppSample.tsx` into your RN app (e.g., `src/`).

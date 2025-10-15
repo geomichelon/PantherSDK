@@ -1,0 +1,74 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Validation Overview",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+    },
+    {
+      "type": "stat",
+      "title": "Validation Requests",
+      "targets": [
+        {"expr": "sum(increase(panther_validation_requests_total[5m]))", "legendFormat": "requests"}
+      ],
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 1},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+    {
+      "type": "stat",
+      "title": "Validation Errors",
+      "targets": [
+        {"expr": "sum(increase(panther_validation_errors_total[5m]))", "legendFormat": "errors"}
+      ],
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 1},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency (seconds)",
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(panther_validation_latency_seconds_bucket[5m])))", "legendFormat": "p50"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(panther_validation_latency_seconds_bucket[5m])))", "legendFormat": "p95"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1}
+    },
+    {
+      "type": "row",
+      "title": "Per Provider",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9}
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency by Provider (seconds)",
+      "targets": [
+        {"expr": "sum by (provider) (rate(panther_validation_provider_latency_seconds_sum[5m])) / sum by (provider) (rate(panther_validation_provider_latency_seconds_count[5m]))", "legendFormat": "{{provider}} avg"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10}
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors by Provider",
+      "targets": [
+        {"expr": "sum by (provider) (increase(panther_validation_provider_errors_total[5m]))", "legendFormat": "{{provider}}"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10}
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["panther", "validation"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Panther Validation",
+  "version": 1
+}
+

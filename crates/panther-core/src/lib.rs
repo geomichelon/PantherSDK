@@ -117,8 +117,15 @@ impl Engine {
             result
         } else {
             // Fallback: run blocking provider on a blocking thread
-            let this = self;
-            tokio::task::spawn_blocking(move || this.generate(prompt)).await.unwrap_or_else(|e| Err(anyhow::anyhow!("join error: {}", e)))
+            let provider = self.provider.clone();
+            let telemetry = self.telemetry.clone();
+            let metrics = self.metrics.clone();
+            let storage = self.storage.clone();
+            tokio::task::spawn_blocking(move || {
+                generate_with_parts(provider, telemetry, metrics, storage, prompt)
+            })
+            .await
+            .unwrap_or_else(|e| Err(anyhow::anyhow!("join error: {}", e)))
         }
     }
 
@@ -167,6 +174,55 @@ fn save_metric(store: &dyn KeyValueStore, name: &str, value: f64, timestamp_ms: 
     if !idx.iter().any(|m| m == name) { idx.push(name.to_string()); }
     store.set(INDEX_KEY, serde_json::to_string(&idx)?)?;
     Ok(())
+}
+
+// Helper used by the async fallback to avoid borrowing `&self` into a 'static closure
+fn generate_with_parts(
+    provider: Arc<dyn LlmProvider>,
+    telemetry: Option<Arc<dyn TelemetrySink>>,
+    metrics: Option<Arc<dyn MetricsSink>>,
+    storage: Option<Arc<dyn KeyValueStore>>,
+    prompt: Prompt,
+) -> anyhow::Result<Completion> {
+    info!(target: "panther", provider = provider.name(), "generating");
+    let start_ms = chrono::Utc::now().timestamp_millis();
+    if let Some(m) = &metrics { m.inc_counter("panther.generate.calls", 1.0); }
+    let result = provider.generate(&prompt);
+    let end_ms = chrono::Utc::now().timestamp_millis();
+
+    if let Some(sink) = &telemetry {
+        if let Ok(c) = &result {
+            let evt = panther_domain::entities::TraceEvent {
+                name: "completion".into(),
+                message: c.text.clone(),
+                timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                attributes: serde_json::json!({"model": c.model}),
+            };
+            sink.record(evt);
+        }
+    }
+    if let Ok(c) = &result {
+        let latency_ms = (end_ms - start_ms).max(0) as f64;
+        let input_tokens = token_count(&prompt.text) as f64;
+        let output_tokens = token_count(&c.text) as f64;
+        let total_tokens = input_tokens + output_tokens;
+
+        if let Some(m) = &metrics {
+            m.observe_histogram("panther.latency_ms", latency_ms);
+            m.observe_histogram("panther.tokens.input", input_tokens);
+            m.observe_histogram("panther.tokens.output", output_tokens);
+            m.observe_histogram("panther.tokens.total", total_tokens);
+        }
+
+        if let Some(store) = &storage {
+            let _ = store.set("panther.last_model", c.model.clone().unwrap_or_default());
+            let _ = save_metric(store.as_ref(), "panther.latency_ms", latency_ms, end_ms);
+            let _ = save_metric(store.as_ref(), "panther.tokens.input", input_tokens, end_ms);
+            let _ = save_metric(store.as_ref(), "panther.tokens.output", output_tokens, end_ms);
+            let _ = save_metric(store.as_ref(), "panther.tokens.total", total_tokens, end_ms);
+        }
+    }
+    result
 }
 
 #[cfg(test)]

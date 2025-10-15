@@ -9,9 +9,12 @@ tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 panther-validation = { path = "../panther-validation", default-features = false, features = ["openai", "ollama"] }
+clap = { version = "4.5", features = ["derive"] }
+csv = "1"
+panther-providers = { path = "../panther-providers" }
+panther-domain = { path = "../panther-domain" }
 
 [features]
 default = ["openai", "ollama"]
 openai = []
 ollama = []
-

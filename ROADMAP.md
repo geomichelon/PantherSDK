@@ -143,7 +143,7 @@ panther-wasm
 
 panther-ai-eval
 - [x] CLI de avaliação com saída e artefatos JSON
-- [ ] Cenários adicionais e batch
+- [x] Cenários adicionais e batch (JSONL/CSV, concorrência, results.jsonl/summary.csv)
 
 panthersdk (aggregator)
 - [x] Re‑exports e domínios utilitários: `metrics`, `storage`, `bias`, `runtime`

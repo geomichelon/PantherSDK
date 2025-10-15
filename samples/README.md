@@ -42,3 +42,31 @@ React Native
   1) `samples/react_native/GENERATE_PROJECT.sh` to create a CLI RN project and copy scaffolding.
   2) Build platform libs and headers (as above), link iOS static lib + header, and place Android `.so` into `jniLibs`.
   3) Wire the native module (iOS add file to target; Android register in a package if needed). Use the exported JS functions to call into Rust.
+
+Agents (Stage 6) — Quickstart via API
+- Enable FFI with agents (e.g., sync providers):
+  - `cargo build -p panther-ffi --features "agents agents-openai agents-ollama"`
+- Start the Python API (loads FFI from `target/*`):
+  - `uvicorn panthersdk.api:create_app --host 0.0.0.0 --port 8000`
+- Trigger an agent run (curl):
+```
+curl -sX POST http://127.0.0.1:8000/agent/run \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "plan": { "type": "ValidateSealAnchor" },
+    "input": {
+      "prompt": "Explain insulin function",
+      "providers": [
+        {"type":"openai","api_key":"'$OPENAI_API_KEY'","base_url":"https://api.openai.com","model":"gpt-4o-mini"}
+      ]
+    },
+    "async_run": true
+  }'
+```
+- Follow up:
+  - `curl -s "http://127.0.0.1:8000/agent/status?run_id=<id>" | jq`
+  - `curl -Ns "http://127.0.0.1:8000/agent/events/stream?run_id=<id>"`
+
+In‑app integration
+- Swift/Kotlin/Flutter/RN can call these HTTP endpoints for orchestration.
+- Or integrate FFI `panther_agent_run` directly (platform bridge). Examples will be added.

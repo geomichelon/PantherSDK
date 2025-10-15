@@ -177,3 +177,26 @@ CLI usage (panther-cli)
 - Validate: `panther validate "prompt here"`
 - Proof status: `panther proof status 0x<hash> --api-base http://127.0.0.1:8000 --api-key secret`
 - Proof history: `panther proof history --limit 50 --api-base http://127.0.0.1:8000`
+
+AI Evaluation CLI (Batch)
+- Run multi‑prompt evaluations locally with concurrency and artifacts.
+- Examples:
+  - JSONL input:
+    - `panther-ai-eval --input data.jsonl --providers providers.json --out outputs --max-concurrency 4 --with-proof`
+  - CSV input:
+    - `panther-ai-eval --input data.csv --providers providers.json --out outputs`
+  - Single‑run:
+    - `panther-ai-eval "Explain insulin function"`
+- Inputs:
+  - Providers (`providers.json`): list of white‑label providers (OpenAI/Ollama)
+  - JSONL/CSV rows: `{ "prompt": "...", "salt"?: "..." }`
+- Outputs:
+  - `outputs/results.jsonl` (one JSON per prompt with results and optional proof)
+  - `outputs/summary.csv` (per provider: total, errors, p50, p95)
+
+- Implementation Status
+  - See `docs/STATUS.md` for what’s implemented vs. backlog aligned to the LLM Testing Framework checklist.
+- ProofSeal Agents (Stage 6)
+  - Orchestration layer that runs Validate → Proof Seal → (optional) Anchor → Status with events.
+  - Use FFI (`panther_agent_run`) or the Python API endpoints `/agent/*`.
+  - See `docs/AGENTS.md` for DSL, examples, and build flags.

@@ -8,8 +8,8 @@ Overview
 - Validation (guidelines ANVISA, multi‑provider, ranking): implemented
 - Proofs (offline) + On‑chain anchoring (optional): implemented
 - Agents (Stage 6) orchestration: implemented (Validate → Seal → Anchor → Status) com timeouts/retries, SSE básico e persistência SQLite de runs
-- Python API (FastAPI) para governança/auditoria: implemented
-- AI Eval CLI (Batch): implemented (JSONL/CSV, concorrência, artifacts, proof opcional)
+- Python API (FastAPI) para governança/auditoria: implemented (inclui métricas rouge/factcheck)
+- AI Eval CLI (Batch): implemented (JSONL/CSV, concorrência, artifacts, proof opcional, flags de métricas)
 - Samples (Swift/Kotlin/Flutter/RN): validação; RN com “Run Agent” via API e helpers
 
 ==================================================
@@ -33,9 +33,9 @@ Geração de código
 
 Geração de conteúdo / Sumários
 - Implemented:
-  - Coerência, diversidade, fluência, BLEU
+  - Coerência, diversidade, fluência, BLEU, ROUGE‑L (F1), fact‑checking básico (coverage)
 - Missing/Next:
-  - ROUGE; fact‑checking; detecção de plágio
+  - Detecção de plágio; fact‑checking avançado (fontes/contradições)
 
 Workflows Enterprise (RAG & Assistentes)
 - Implemented: —
@@ -46,8 +46,8 @@ Workflows Enterprise (RAG & Assistentes)
 ==================================================
 B. Evaluation Metrics
 
-- Implemented: Acurácia (exact match), BLEU, Coerência, Diversidade, Fluência
-- Missing/Next: ROUGE, plagiarismo, fact‑checking, custos ($/token) e métricas customizadas por indústria
+- Implemented: Acurácia (exact match), BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage (básico)
+- Missing/Next: Plagiarismo, fact‑checking avançado (fontes/contradições), custos ($/token) e métricas customizadas por indústria
 
 ==================================================
 C. Integration & Key Benefits
@@ -67,6 +67,7 @@ Execução em lote (suites)
 - Implemented: `panther-ai-eval` com `--input {jsonl|csv}`, `--max-concurrency`, `--with-proof`, outputs `results.jsonl` + `summary.csv`
 - Missing/Next: diretórios de cenários/presets e relatórios enriquecidos
 
+- Feedback em tempo real
 - Implemented: SSE básico em `/agent/events/stream` (pings durante execução + eventos ao finalizar)
 - Missing/Next: streaming incremental por evento (FFI start/poll/status/result)
 
@@ -111,13 +112,13 @@ Feature Map (by crate)
 - panther-core: engine generate/generate_async, métricas/storage — OK
 - panther-providers: OpenAI/Ollama (sync/async) — OK (async opcional)
 - panther-validation: guidelines ANVISA, LLMValidator (sync/async), proofs/offchain — OK
-- panther-ffi: C ABI estável; validation/metrics/storage/logs/helpers; blockchain opcional — OK
+ - panther-ffi: C ABI estável; validation/metrics/storage/logs/helpers; blockchain opcional — OK (métricas novas: rouge_l, fact_coverage)
 - panther-agents (Stage 6): Runner + FFI + API; timeouts/retries; logs/events — OK
 - panther-cli: validate + proof status/history — OK (batch pendente)
-- panther-ai-eval: CLI de avaliação em batch (JSONL/CSV), concorrência e artifacts (results.jsonl/summary.csv)
+ - panther-ai-eval: CLI de avaliação em batch (JSONL/CSV), concorrência e artifacts (results.jsonl/summary.csv), flags `--metrics rouge,factcheck`
 - panther-storage / sled: KV in‑memory/sled — OK (SQL pendente)
 - panther-observability / panther-metrics: logging/metrics básicos — OK (exporters pendentes)
-- python/panthersdk: FastAPI (generate/metrics/validation/proof/agents) — OK
+ - python/panthersdk: FastAPI (generate/metrics/validation/proof/agents) — OK (suporta `metric=rouge|factcheck`)
 - samples (Swift/Kotlin/Flutter/RN): validação; RN com “Run Agent” — OK
 
 ==================================================
@@ -131,26 +132,23 @@ Build/Features Cheatsheet
 ==================================================
 Backlog Prioritário
 
-1) Batch runner no `panther-ai-eval`
-   - JSONL/CSV, cenários, concorrência (`--max-concurrency`), artefatos (JSON/CSV)
+1) Métricas & Verificação de Conteúdo
+   - Plágio; fact‑checking avançado (fontes/contradições); custo por provider
 
-2) Métricas & Verificação de Conteúdo
-   - ROUGE; fact‑checking (fontes externas); detecção de plágio; custo por provider
-
-3) RAG & Assistentes
+2) RAG & Assistentes
    - Precisão/recall (top‑k); experimentos de indexação (threshold/chunks); relatórios
 
-4) Streaming em Tempo Real
+3) Streaming em Tempo Real
    - FFI start/poll/status/result; SSE incremental por evento; cursors (`Last-Event-ID`)
 
-5) Monitoramento & KPIs
+4) Monitoramento & KPIs
    - Prometheus para validação/latência/erros por provider; dashboards e alertas; KPIs definidos
 
-6) SQL Analytics
+5) SQL Analytics
    - Esquema persistente para avaliações/métricas; consultas por período/provider/modelo; relatórios
 
-7) Métricas Customizadas por Indústria
+6) Métricas Customizadas por Indústria
    - Plugin/DSL para adicionar métricas específicas (regulatórias/negócio) e ingestão de guidelines (Drive/S3)
 
-8) Experimentos Reproduzíveis
+7) Experimentos Reproduzíveis
    - Presets (Gherkin/COPA; RAG) + scripts e recomendações

@@ -77,3 +77,35 @@ pub fn evaluate_fluency(text: &str) -> f64 {
     (good as f64) / (tokens.len() as f64)
 }
 
+// ROUGE-L F1 (LCS-based) — simplified implementation
+pub fn evaluate_rouge_l(reference: &str, candidate: &str) -> f64 {
+    let r: Vec<&str> = tokenize(reference);
+    let c: Vec<&str> = tokenize(candidate);
+    if r.is_empty() || c.is_empty() { return 0.0; }
+    // LCS length via DP O(n*m)
+    let n = r.len();
+    let m = c.len();
+    let mut dp = vec![vec![0usize; m + 1]; n + 1];
+    for i in 0..n {
+        for j in 0..m {
+            if r[i] == c[j] {
+                dp[i + 1][j + 1] = dp[i][j] + 1;
+            } else {
+                dp[i + 1][j + 1] = dp[i + 1][j].max(dp[i][j + 1]);
+            }
+        }
+    }
+    let lcs = dp[n][m] as f64;
+    let prec = lcs / (m as f64);
+    let rec = lcs / (n as f64);
+    if prec + rec == 0.0 { 0.0 } else { (2.0 * prec * rec) / (prec + rec) }
+}
+
+// Fact-check coverage: percentage of expected facts/terms present in candidate
+pub fn evaluate_fact_coverage(facts: &[String], candidate: &str) -> f64 {
+    if facts.is_empty() { return 1.0; }
+    let low = candidate.to_ascii_lowercase();
+    let mut hits = 0usize;
+    for f in facts { if !f.is_empty() && low.contains(&f.to_ascii_lowercase()) { hits += 1; } }
+    (hits as f64) / (facts.len() as f64)
+}

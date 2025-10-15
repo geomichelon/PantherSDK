@@ -1,0 +1,9 @@
+[package]
+name = "panther-metrics-content"
+version.workspace = true
+edition.workspace = true
+description = "Content metrics (BLEU, ROUGE-L, coherence, diversity, fluency, fact coverage)"
+
+[dependencies]
+anyhow.workspace = true
+

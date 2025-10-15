@@ -2134,6 +2134,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "panther-metrics-content"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
 name = "panther-observability"
 version = "0.1.2"
 dependencies = [
@@ -2208,6 +2215,7 @@ dependencies = [
  "panther-core",
  "panther-domain",
  "panther-metrics",
+ "panther-metrics-content",
  "panther-observability",
  "panther-providers",
  "panther-storage",

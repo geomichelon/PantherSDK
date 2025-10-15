@@ -67,3 +67,37 @@ export async function anchorProof(hash: string, apiBase?: string, apiKey?: strin
   });
   return res.json();
 }
+
+// --- Agents (Stage 6) ---
+export async function runAgent(plan: any, input: any, apiBase?: string, apiKey?: string, asyncRun: boolean = true): Promise<{run_id?: string; result?: any; status?: string; error?: string}> {
+  const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+  const res = await fetch(`${base}/agent/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    },
+    body: JSON.stringify({ plan, input, async_run: asyncRun }),
+  });
+  return res.json();
+}
+
+export async function getAgentStatus(runId: string, apiBase?: string, apiKey?: string): Promise<{run_id: string; status: string; done: boolean; error?: string}> {
+  const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+  const res = await fetch(`${base}/agent/status?run_id=${encodeURIComponent(runId)}`, {
+    headers: {
+      ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    },
+  });
+  return res.json();
+}
+
+export async function getAgentEvents(runId: string, apiBase?: string, apiKey?: string): Promise<{run_id: string; events: any[]; error?: string}> {
+  const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+  const res = await fetch(`${base}/agent/events?run_id=${encodeURIComponent(runId)}`, {
+    headers: {
+      ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    },
+  });
+  return res.json();
+}

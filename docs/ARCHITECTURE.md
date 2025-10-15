@@ -89,6 +89,7 @@ Proofs & Blockchain (Auditoria)
 - Stage 3 (Ops & UX):
   - API fornece histórico (`/proof/history`) com eventos de `anchor`/`status` (em memória, com limite), além de `explorer_url`/`contract_url` quando configurado `PANTHER_EXPLORER_BASE`.
   - Samples incluem botões “Check Status” e abrem links para explorer/contrato quando disponíveis.
+  - Stage 6 (ProofSeal Agents): orquestrador assíncrono com plano `ValidateSealAnchor`, exposto via FFI (`panther_agent_run`) e endpoints `/agent/*`. Ver `docs/AGENTS.md`.
 
 Platform Facades (Samples)
 - iOS (Swift): `PantherSDK` facade wraps the FFI and exposes:

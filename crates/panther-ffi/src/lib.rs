@@ -218,6 +218,21 @@ pub extern "C" fn panther_version_string() -> *mut std::os::raw::c_char {
     rust_string_to_c(env!("CARGO_PKG_VERSION").to_string())
 }
 
+// ---------- Agents (optional Stage 6) ----------
+#[cfg(feature = "agents")]
+#[no_mangle]
+pub extern "C" fn panther_agent_run(plan_json_c: *const c_char, input_json_c: *const c_char) -> *mut std::os::raw::c_char {
+    let plan_json = unsafe { CStr::from_ptr(plan_json_c).to_string_lossy().into_owned() };
+    let input_json = unsafe { CStr::from_ptr(input_json_c).to_string_lossy().into_owned() };
+    match panther_agents::run_plan(&plan_json, &input_json) {
+        Ok(res) => {
+            let s = serde_json::to_string(&res).unwrap_or_else(|_| "{}".to_string());
+            rust_string_to_c(s)
+        }
+        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn panther_generate(prompt_c: *const c_char) -> *mut std::os::raw::c_char {
     let prompt = unsafe { CStr::from_ptr(prompt_c).to_string_lossy().into_owned() };
@@ -357,6 +372,8 @@ pub extern "C" fn panther_validation_run_custom_with_proof(
         Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
     }
 }
+#[cfg(feature = "validation")]
+#[no_mangle]
 pub extern "C" fn panther_validation_run_default(prompt_c: *const c_char) -> *mut std::os::raw::c_char {
     let prompt = unsafe { CStr::from_ptr(prompt_c).to_string_lossy().into_owned() };
     let guidelines_json: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../panther-validation/guidelines/anvisa.json"));

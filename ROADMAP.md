@@ -11,10 +11,13 @@ Visão Rápida
 - [x] Storage KV (in-memory e sled)
 - [x] Samples: Swift, Kotlin, Flutter, React Native
 - [x] Versão em FFI (`panther_version_string` dinâmico)
-- [ ] Providers assíncronos (OpenAI/Ollama/Anthropic)
-- [ ] Prometheus exporter e p50/p95
+- [x] Providers assíncronos (OpenAI/Ollama — básicos com timeouts/retries)
+- [ ] Anthropic (assíncrono)
+- [ ] Exportador Prometheus (Rust) e agregações p50/p95 consolidadas
+- [x] p50/p95 no CLI de validação
 - [ ] SQL analytics (SQLite/Postgres)
 - [ ] Suíte de testes cross‑FFI e automação de bindings
+ - [x] RAG baseline no `panther-ai-eval` (flags `--rag-*` e artifacts)
 
 Por Feature (do panther_features.yaml)
 
@@ -22,7 +25,7 @@ Core Runtime
 - [x] Orquestração (`Engine`) e telemetria básica
 - [x] Métricas simples (contadores/histogramas) e token count
 - [x] Providers: `NullProvider` + OpenAI/Ollama (bloco síncrono)
-- [ ] `LlmProvider` assíncrono e adapters de produção
+- [x] `LlmProvider` assíncrono e adapters de produção (OpenAI/Ollama)
 - [ ] Tokenizer abstrato
 
 Storage e Dados
@@ -44,7 +47,7 @@ Python API
 - [x] PyO3 módulo (`panther-py`) com `init/generate/bleu/get_history/detect_bias`
 - [ ] Workflows de policy evaluation
 - [ ] JWT + audit logging
-- [ ] Endpoints de guidelines/validação integrados
+- [x] Endpoints de guidelines/validação integrados
 
 Compliance/Guidelines
 - [x] `LLMValidator` (paraleliza, mede latência, ranqueia score)
@@ -63,8 +66,9 @@ Blockchain / Verificação
 
 Observabilidade/Métricas
 - [x] `tracing` + sink de logs
-- [ ] Exportador Prometheus
-- [ ] Agregações p50/p95
+- [ ] Exportador Prometheus (Rust) e integração ampla
+- [ ] Agregações p50/p95 (Prometheus/dashboards)
+- [x] Métricas Prometheus no backend (Python) para proofs/agents/validação
 - [ ] Correlação de spans cross‑FFI
 
 Developer Experience
@@ -92,13 +96,13 @@ panther-domain
 panther-core
 - [x] `Engine::generate` com telemetria, métricas e persistência
 - [x] `generate_async` (assinatura pronta; corpo síncrono)
-- [ ] Evoluir para providers assíncronos reais
+- [x] Providers assíncronos reais (OpenAI/Ollama) via traits
 
 panther-providers
 - [x] `NullProvider`
 - [x] OpenAI/Ollama (reqwest blocking)
-- [ ] Migrar para `reqwest` async + timeouts/retries
-- [ ] Anthropic
+- [x] `reqwest` async + timeouts/retries (OpenAI/Ollama)
+- [ ] Anthropic (sync/async)
 
 panther-observability
 - [x] `init_logging` e `LogSink`
@@ -126,7 +130,7 @@ panther-validation
 
 panther-cli
 - [x] Comando `validate` com saida tabular
-- [ ] Expor p50/p95 e sumarização
+- [x] Expor p50/p95 e sumarização
 
 panther-py
 - [x] Módulo PyO3 `pantherpy`
@@ -144,6 +148,7 @@ panther-wasm
 panther-ai-eval
 - [x] CLI de avaliação com saída e artefatos JSON
 - [x] Cenários adicionais e batch (JSONL/CSV, concorrência, results.jsonl/summary.csv)
+ - [x] RAG: `--rag-*` com `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`
 
 panthersdk (aggregator)
 - [x] Re‑exports e domínios utilitários: `metrics`, `storage`, `bias`, `runtime`

@@ -66,6 +66,21 @@ Curl examples
          }' \
      http://localhost:8000/validation/run_multi | jq`
 
+- Metrics — Plagiarism (Jaccard n-gram, MVP):
+  - `curl -s -X POST \
+     -H 'Content-Type: application/json' \
+     -H 'X-API-Key: secret' \
+     -d '{
+           "metric": "plagiarism",
+           "text": "Insulin regulates glucose in the blood.",
+           "samples": [
+             "Insulin helps regulate blood glucose.",
+             "Vitamin C supports the immune system."
+           ]
+         }' \
+     http://localhost:8000/metrics/evaluate | jq`
+  - Resposta: `{ "score": 0.xx }` (0..1). Para corpus maiores, envie `samples` como lista.
+
 - Proof compute (Stage 1, offline):
   - Primeiro execute uma validação (como acima) e capture `results` (array JSON).
   - `curl -s -X POST \
@@ -187,8 +202,20 @@ Prometheus scrape (example)
   metrics_path: /metrics
 ```
 
-Grafana dashboard
-- Import `docs/dashboards/panther_validation_dashboard.json` em Grafana para visualizar p50/p95, latência média por provider e erros por provider.
+Grafana dashboards
+- Validation: import `docs/dashboards/panther_validation_dashboard.json` para visualizar p50/p95, latência média por provider e erros por provider.
+- Agents: import `docs/dashboards/panther_agents_dashboard.json` para runs/min, in‑progress, eventos por etapa e p50/p95 por etapa.
+
+Monitoring stack via Docker Compose (optional)
+- Bring up API + Prometheus + Grafana together:
+  - `docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d`
+- Access:
+  - API: http://127.0.0.1:8000 (metrics at `/metrics`)
+  - Prometheus: http://127.0.0.1:9090
+  - Grafana: http://127.0.0.1:3000 (admin/admin)
+- Prometheus config used: `docs/monitoring/prometheus.yml` (scrapes `api:8000/metrics`).
+- Grafana provisioning: data source (Prometheus) e dashboards são carregados automaticamente a partir de `docs/monitoring/grafana/provisioning/*` e `docs/dashboards/*`.
+- Alertas (Prometheus): regras em `docs/monitoring/alerts.yml` (p95 de latência e taxa de erro para validação; p95 por etapa e falhas de runs para agents). Ajuste thresholds conforme seu SLO.
 
 CLI usage (panther-cli)
 - Validate: `panther validate "prompt here"`
@@ -206,12 +233,41 @@ AI Evaluation CLI (Batch)
     - Providers: use `--providers providers.json` (JSON). A CSV example is available at `samples/data/providers.example.csv` for reference, but the CLI expects JSON for `--providers`.
   - Single‑run:
     - `panther-ai-eval "Explain insulin function"`
+  - Plagiarism metric (using JSONL corpus with {text}):
+    - `panther-ai-eval --input samples/data/eval_sample.jsonl --providers samples/data/providers.example.json \
+       --out outputs --metrics plagiarism --plag-corpus samples/data/rag_index.jsonl --plag-ngram 3`
+    - O corpus pode ser JSONL (cada linha string ou `{text}`), CSV (coluna `text|content`) ou diretório de `.txt`.
+
+Example results.jsonl (excerpt)
+```
+{"index":0,"prompt":"Explain insulin function","results":[{"provider_name":"openai:gpt-4o-mini","adherence_score":92.5,"missing_terms":[],"latency_ms":840,"cost":null,"raw_text":"Insulin regulates glucose..."}],"metrics":{"plagiarism":0.36}}
+```
 - Inputs:
   - Providers (`providers.json`): list of white‑label providers (OpenAI/Ollama)
   - JSONL/CSV rows: `{ "prompt": "...", "salt"?: "..." }`
 - Outputs:
   - `outputs/results.jsonl` (one JSON per prompt with results and optional proof)
   - `outputs/summary.csv` (per provider: total, errors, p50, p95)
+  - `outputs/summary_consistency.csv` (per provider across prompts: mean/std of adherence, cv, consistency_index [0–1], mean/std latency)
+
+RAG evaluation (baseline)
+- Dataset example: `samples/data/rag_index.jsonl` (docs `{id,text}`) e `samples/data/rag_prompts.jsonl` (prompts com `labels` esperados)
+- Run:
+  - `panther-ai-eval --input samples/data/rag_prompts.jsonl --rag-index samples/data/rag_index.jsonl --rag-k 3 --out outputs`
+- Outputs:
+  - `outputs/rag_results.jsonl` (por prompt: lista top‑k `{id,score}`)
+  - `outputs/rag_summary.csv` (média de `precision@k` e `recall@k`, mais `k`, `threshold`, `n`)
+
+Consistency across prompts (how to use)
+- Prepare a multi‑prompt file (JSONL or CSV). Example (JSONL):
+  - `{"prompt":"Explain insulin function"}`
+  - `{"prompt":"What is HbA1c?"}`
+  - `{"prompt":"List risk factors for type 2 diabetes"}`
+- Run batch as usual (see examples above). The CLI aggregates adherence scores and latencies across prompts per provider and emits:
+  - `summary_consistency.csv` with:
+    - `mean_score`, `std_score`, `cv_score` (coeficiente de variação)
+    - `consistency_index = 1 - cv_score` (clamp 0..1), quanto mais próximo de 1, mais estável o provider nos prompts do cenário
+    - `mean_latency_ms`, `std_latency_ms`
 
 - Implementation Status
   - See `docs/STATUS.md` for what’s implemented vs. backlog aligned to the LLM Testing Framework checklist.

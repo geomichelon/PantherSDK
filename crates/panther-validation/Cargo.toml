@@ -30,5 +30,7 @@ path = "examples/validate_llms.rs"
 [dependencies.ethers]
 version = "2"
 default-features = false
-features = ["abigen","contract","providers","signers","core","rustls"]
+# Keep features minimal to avoid feature name mismatches during resolution
+# when `blockchain-eth` is not enabled. Expand as needed when enabling.
+features = []
 optional = true

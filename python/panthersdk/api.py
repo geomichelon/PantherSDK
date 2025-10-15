@@ -67,6 +67,12 @@ class ProofRequest(BaseModel):
     salt: str | None = None
 
 
+class AgentRunRequest(BaseModel):
+    plan: dict | None = None
+    input: dict
+    async_run: bool | None = False
+
+
 def _lib_names_for_platform() -> list[str]:
     system = platform.system().lower()
     if system.startswith("darwin") or system == "darwin":
@@ -133,6 +139,11 @@ def _load_rust_lib():
                 except Exception:
                     pass
                 try:
+                    lib.panther_agent_run.argtypes = [c_char_p, c_char_p]
+                    lib.panther_agent_run.restype = c_char_p
+                except Exception:
+                    pass
+                try:
                     lib.panther_proof_verify_local.argtypes = [c_char_p, c_char_p, c_char_p, c_char_p, c_char_p, c_char_p]
                     lib.panther_proof_verify_local.restype = ctypes.c_int
                 except Exception:
@@ -187,6 +198,18 @@ def _init_db():
                 anchored INTEGER,
                 explorer_url TEXT,
                 contract_url TEXT
+            )
+            """
+        )
+        _DB.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent_runs (
+                run_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                started_ts INTEGER NOT NULL,
+                finished_ts INTEGER,
+                result_json TEXT,
+                events_json TEXT
             )
             """
         )
@@ -484,6 +507,150 @@ def create_app() -> FastAPI:
             "sdk_version": "python-api",
             "salt_present": bool(req.salt),
         }
+
+    # --- Agents (Stage 6) ---
+    _AGENT_RUNS: dict[str, dict] = {}
+    _AGENT_LOCK = threading.Lock()
+
+    def _gen_run_id() -> str:
+        return f"r{int(time.time()*1000)}-{os.getpid()}"
+
+    @app.post("/agent/run")
+    def agent_run(req: AgentRunRequest, _auth=Depends(_auth_guard)):
+        plan = req.plan or {"type": "ValidateSealAnchor"}
+        input_obj = req.input
+        run_id = _gen_run_id()
+
+        def _exec_and_store():
+            try:
+                plan_s = json.dumps(plan)
+                input_s = json.dumps(input_obj)
+                if _RUST and hasattr(_RUST, "panther_agent_run"):
+                    s = _RUST.panther_agent_run(plan_s.encode("utf-8"), input_s.encode("utf-8"))
+                    try:
+                        data = ctypes.cast(s, c_char_p).value.decode("utf-8")
+                        out = json.loads(data)
+                    finally:
+                        _RUST.panther_free_string(s)
+                else:
+                    out = {"error": "agents FFI unavailable"}
+            except Exception as e:
+                out = {"error": str(e)}
+            with _AGENT_LOCK:
+                st = _AGENT_RUNS.get(run_id, {"status": "running", "events": []})
+                st["status"] = "done"
+                st["result"] = out
+                try:
+                    st["events"] = list(out.get("events", []))
+                except Exception:
+                    pass
+                _AGENT_RUNS[run_id] = st
+
+        with _AGENT_LOCK:
+            _AGENT_RUNS[run_id] = {"status": "running", "events": []}
+        # Persist start if DB available
+        try:
+            if _DB is not None:
+                with _DB_LOCK:
+                    _DB.execute(
+                        "INSERT OR REPLACE INTO agent_runs(run_id,status,started_ts) VALUES(?,?,?)",
+                        (run_id, "running", int(time.time()*1000)),
+                    )
+                    _DB.commit()
+        except Exception:
+            pass
+
+        if req.async_run:
+            th = threading.Thread(target=_exec_and_store, daemon=True)
+            th.start()
+            return {"run_id": run_id, "status": "running"}
+        else:
+            _exec_and_store()
+            with _AGENT_LOCK:
+                out = {"run_id": run_id, **_AGENT_RUNS.get(run_id, {})}
+            # Persist finish if DB available
+            try:
+                if _DB is not None:
+                    with _DB_LOCK:
+                        st = _AGENT_RUNS.get(run_id, {})
+                        _DB.execute(
+                            "UPDATE agent_runs SET status=?, finished_ts=?, result_json=?, events_json=? WHERE run_id=?",
+                            (
+                                st.get("status"),
+                                int(time.time()*1000),
+                                json.dumps(st.get("result")),
+                                json.dumps(st.get("events", [])),
+                                run_id,
+                            ),
+                        )
+                        _DB.commit()
+            except Exception:
+                pass
+            return out
+
+    @app.get("/agent/status")
+    def agent_status(run_id: str, _auth=Depends(_auth_guard)):
+        with _AGENT_LOCK:
+            st = _AGENT_RUNS.get(run_id)
+        if st:
+            return {"run_id": run_id, "status": st.get("status"), "done": st.get("status") == "done"}
+        # Fallback to DB if not in memory
+        if _DB is not None:
+            try:
+                with _DB_LOCK:
+                    cur = _DB.execute("SELECT status, finished_ts FROM agent_runs WHERE run_id=?", (run_id,))
+                    row = cur.fetchone()
+                    if not row:
+                        raise HTTPException(status_code=404, detail="run not found")
+                    status, finished_ts = row
+                    return {"run_id": run_id, "status": status, "done": bool(finished_ts)}
+            except HTTPException:
+                raise
+            except Exception as e:
+                return {"error": str(e)}
+        raise HTTPException(status_code=404, detail="run not found")
+
+    @app.get("/agent/events")
+    def agent_events(run_id: str, _auth=Depends(_auth_guard)):
+        with _AGENT_LOCK:
+            st = _AGENT_RUNS.get(run_id)
+            if st:
+                return {"run_id": run_id, "events": st.get("events", [])}
+        if _DB is not None:
+            try:
+                with _DB_LOCK:
+                    cur = _DB.execute("SELECT events_json FROM agent_runs WHERE run_id=?", (run_id,))
+                    row = cur.fetchone()
+                    if not row:
+                        raise HTTPException(status_code=404, detail="run not found")
+                    events_json = row[0] or "[]"
+                    return {"run_id": run_id, "events": json.loads(events_json)}
+            except HTTPException:
+                raise
+            except Exception as e:
+                return {"error": str(e)}
+        raise HTTPException(status_code=404, detail="run not found")
+
+    @app.get("/agent/events/stream")
+    def agent_events_stream(run_id: str, _auth=Depends(_auth_guard)):
+        # Minimal SSE: waits until run finishes, then streams events and closes
+        import time as _t
+        from fastapi.responses import StreamingResponse
+
+        def _gen():
+            # Poll status until done
+            for _ in range(600):  # up to ~60s
+                st = agent_status(run_id)
+                if st.get("done"):
+                    break
+                yield "event: ping\n".encode()
+                yield f"data: {json.dumps({'run_id': run_id, 'status': st.get('status')})}\n\n".encode()
+                _t.sleep(0.1)
+            # Send events in batch
+            evs = agent_events(run_id).get("events", [])
+            for ev in evs:
+                yield f"data: {json.dumps(ev)}\n\n".encode()
+        return StreamingResponse(_gen(), media_type="text/event-stream")
 
     @app.get("/audit/logs")
     def audit_logs(_auth=Depends(_auth_guard)):

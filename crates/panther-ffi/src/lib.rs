@@ -13,6 +13,8 @@ use std::os::raw::c_char;
 static ENGINE: OnceCell<Engine> = OnceCell::new();
 static LOGS: OnceCell<std::sync::Mutex<Vec<String>>> = OnceCell::new();
 static STORAGE: OnceCell<Arc<dyn KeyValueStore>> = OnceCell::new();
+#[cfg(feature = "metrics-prometheus")]
+static PROM: OnceCell<Arc<panther_metrics::PrometheusMetrics>> = OnceCell::new();
 
 #[no_mangle]
 pub extern "C" fn panther_init() -> i32 {
@@ -23,12 +25,19 @@ pub extern "C" fn panther_init() -> i32 {
     let engine = Engine::new(provider, telemetry);
 
     // Conditionally augment the engine without mutable bindings by shadowing
-    #[cfg(feature = "metrics-inmemory")]
+    #[cfg(any(feature = "metrics-inmemory", feature = "metrics-prometheus"))]
     let engine = {
-        let metrics = Arc::new(panther_metrics::InMemoryMetrics::default());
+        #[cfg(feature = "metrics-prometheus")]
+        let metrics = {
+            let m = Arc::new(panther_metrics::PrometheusMetrics::default());
+            let _ = PROM.set(m.clone());
+            m as Arc<dyn panther_domain::ports::MetricsSink>
+        };
+        #[cfg(all(not(feature = "metrics-prometheus"), feature = "metrics-inmemory"))]
+        let metrics = Arc::new(panther_metrics::InMemoryMetrics::default()) as Arc<dyn panther_domain::ports::MetricsSink>;
         engine.with_metrics(metrics)
     };
-    #[cfg(not(feature = "metrics-inmemory"))]
+    #[cfg(not(any(feature = "metrics-inmemory", feature = "metrics-prometheus")))]
     let engine = engine;
 
     #[cfg(feature = "storage-inmemory")]
@@ -978,4 +987,14 @@ pub extern "C" fn panther_validation_run_custom(
         Ok::<String, anyhow::Error>(serde_json::to_string(&results)? )
     });
     match res { Ok(s) => rust_string_to_c(s), Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)), }
+}
+// Prometheus scrape (Rust exporter)
+#[cfg(feature = "metrics-prometheus")]
+#[no_mangle]
+pub extern "C" fn panther_prometheus_scrape() -> *mut std::os::raw::c_char {
+    if let Some(prom) = PROM.get() {
+        let s = prom.scrape();
+        return rust_string_to_c(s);
+    }
+    rust_string_to_c(String::new())
 }

@@ -67,7 +67,7 @@ Blockchain / Verificação
 Observabilidade/Métricas
 - [x] `tracing` + sink de logs
 - [ ] Exportador Prometheus (Rust) e integração ampla
-- [ ] Agregações p50/p95 (Prometheus/dashboards)
+- [x] Agregações p50/p95 (Prometheus/dashboards)
 - [x] Métricas Prometheus no backend (Python) para proofs/agents/validação
 - [ ] Correlação de spans cross‑FFI
 

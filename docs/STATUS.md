@@ -8,13 +8,13 @@ Status Highlights
   - Core runtime (Rust), FFI estável, validação multi‑provider (ANVISA), provas offline + ancoragem on‑chain (opcional)
   - Agents (Stage 6) com orquestração Validate → Seal → Anchor → Status, timeouts/retries, SSE incremental e persistência (SQLite)
   - API Python modular (routers: health, validation, metrics, proof, agents)
-  - AI Eval CLI (batch): JSONL/CSV, concorrência, artifacts (results.jsonl/summary.csv), `--with-proof`, `--metrics rouge,factcheck,plagiarism`, `--usd-per-1k`; RAG com flags `--rag-*` e artifacts `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`; Consistência multi‑prompt com `--variants`, `--scenarios` e relatório `consistency_report.html`; Modo API‑backed para `factcheck_sources`/`contextual_relevance`/`bias_rewrite`
+  - AI Eval CLI (batch): JSONL/CSV, concorrência, artifacts (results.jsonl/summary.csv), `--with-proof`, `--metrics rouge,factcheck,plagiarism`, `--usd-per-1k`; RAG com flags `--rag-*` e artifacts `rag_results.jsonl/rag_summary.csv/rag_experiments.csv`; Consistência multi‑prompt com `--variants`, `--scenarios` e relatório `consistency_report.html`; Relatório avançado (comparativos + custos); Modo API‑backed para `factcheck_sources`/`contextual_relevance`/`bias_rewrite`
   - Métricas de conteúdo: Acurácia, BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage
   - Prometheus: validação por provider + Agents (estágios) com dashboards (docs/dashboards)
   - Providers assíncronos (OpenAI/Ollama) com timeouts/retries básicos (features opcionais)
   - Plágio (MVP): similaridade Jaccard de n‑gramas (3‑gramas) exposta via métricas/FFI/API/CLI
-  - Fact‑checking avançado (MVP): API `metric=factcheck_sources` (coverage + top fontes + contradições heurísticas/NLI opcional)
-  - Bias avançado (MVP): API `metric=bias_adv` com `group_counts`/`disparity`
+  - Fact‑checking avançado (MVP): API `metric=factcheck_sources` (coverage + top fontes + contradições heurísticas/NLI opcional, thresholds por fonte e ranking/auditoria)
+  - Bias avançado (MVP): API `metric=bias_adv` com `group_counts`/`disparity`; `contextual_relevance` (domínio/idioma); `bias_rewrite` (reescrita guiada)
   - Porta `ContentMetrics` no domínio com implementação padrão e injeção (trait + default impl)
 
 - <span style="color:#ef6c00"><b>🟡 Parcial</b></span>
@@ -87,10 +87,10 @@ Workflows Enterprise (RAG & Assistentes)
   - Auditorias de privacidade (PII) e monitoramento por rota (latência p95/erros)
 
 ==================================================
-B. Evaluation Metrics
-Status: <span style="color:#2e7d32"><b>~80%</b></span> [█████████████████░]
+- B. Evaluation Metrics
+Status: <span style="color:#2e7d32"><b>~82%</b></span> [██████████████████]
 
-- ✅ Implemented: Acurácia (exact match), BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage (básico), Plágio (MVP Jaccard n‑gramas), Fact‑checking com fontes (MVP `factcheck_sources`), Bias avançado (MVP `bias_adv`)
+- ✅ Implemented: Acurácia (exact match), BLEU, Coerência, Diversidade, Fluência, ROUGE‑L (F1), Fact‑coverage (básico), Plágio (MVP Jaccard n‑gramas), Fact‑checking com fontes (MVP `factcheck_sources`), Bias avançado (MVP `bias_adv`), Contextual relevance (MVP), Guided rewrite (MVP)
 - ⛔ Missing/Next: Plagiarismo avançado (top‑k fontes, embeddings/SimHash), fact‑checking avançado (fontes/contradições), custos por provider/modelo (tabelas de preços) e métricas customizadas por indústria
 
 ==================================================
@@ -246,11 +246,11 @@ Backlog por Feature (detalhado)
 
 ==================================================
 Progress Summary (Percentual)
-- Geral: <span style="color:#ef6c00"><b>~60%</b></span> [█████████████░░░░░]
-- A. Casos de Uso: <span style="color:#ef6c00"><b>~50%</b></span> [██████████░░░░░░░░]
-- B. Métricas: <span style="color:#2e7d32"><b>~80%</b></span> [█████████████████░]
+- Geral: <span style="color:#ef6c00"><b>~62%</b></span> [██████████████░░░░]
+- A. Casos de Uso: <span style="color:#ef6c00"><b>~52%</b></span> [███████████░░░░░░]
+- B. Métricas: <span style="color:#2e7d32"><b>~82%</b></span> [██████████████████]
 - C. Integração & Benefícios: <span style="color:#2e7d32"><b>~70%</b></span> [██████████████░░░░]
-- D. Execução/Feedback/Monitoramento: <span style="color:#ef6c00"><b>~68%</b></span> [█████████████░░░░░]
+- D. Execução/Feedback/Monitoramento: <span style="color:#ef6c00"><b>~70%</b></span> [██████████████░░░]
 - E. Funcionalidades Únicas: <span style="color:#ef6c00"><b>~40%</b></span> [████████░░░░░░░░░░]
 - F. Experimentos & Recomendações: <span style="color:#d32f2f"><b>~0%</b></span> [░░░░░░░░░░░░░░░░░░]
 - G. Resultado de Negócio: <span style="color:#ef6c00"><b>~50%</b></span> [██████████░░░░░░░░]

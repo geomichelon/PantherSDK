@@ -24,6 +24,7 @@ panther-agents = { path = "../panther-agents", optional = true }
 [features]
 default = []
 metrics-inmemory = ["dep:panther-metrics"]
+metrics-prometheus = ["dep:panther-metrics", "panther-metrics/prometheus-exporter"]
 storage-inmemory = ["dep:panther-storage"]
 storage-sled = ["dep:panther-storage-sled"]
 metrics = ["metrics-inmemory"]

@@ -41,12 +41,17 @@ class PantherSDK private constructor(private val providersJson: String) {
         return try {
             val obj = org.json.JSONObject(raw)
             val arr = obj.getJSONArray("results")
+            val tin = PantherBridge.tokenCount(prompt)
             val lines = (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
                 val name = o.optString("provider_name", "?")
                 val score = o.optDouble("adherence_score", 0.0)
                 val lat = o.optInt("latency_ms", 0)
-                String.format("%s – %.1f%% – %d ms", name, score, lat)
+                val text = o.optString("raw_text", "")
+                val tout = PantherBridge.tokenCount(text)
+                val rules = (customCostRulesJson ?: defaultCostRulesJson)
+                val cost = PantherBridge.calculateCost(tin, tout, name, rules)
+                String.format("%s – %.1f%% – %d ms – %d/%d tok – $%.4f", name, score, lat, tin, tout, cost)
             }
             val proof = obj.optJSONObject("proof")?.optString("combined_hash", null)
             lines to proof
@@ -89,5 +94,23 @@ class PantherSDK private constructor(private val providersJson: String) {
         }
 
         fun version(): String = try { PantherBridge.version() } catch (_: Throwable) { "" }
+
+        // Default pricing (editable in-app if desired)
+        val defaultCostRulesJson: String = """
+[
+  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.15, "usd_per_1k_out": 0.60},
+  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.30, "usd_per_1k_out": 1.20},
+  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},
+  {"match": "openai:gpt-4o",       "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},
+  {"match": "openai:chatgpt-5",    "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},
+  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},
+  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},
+  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00}
+]
+"""
+
+        // Optional runtime override (set from activities/fragments)
+        @JvmStatic var customCostRulesJson: String? = null
+        @JvmStatic fun setCostRulesJson(json: String?) { customCostRulesJson = json }
     }
 }

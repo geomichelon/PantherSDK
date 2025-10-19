@@ -27,6 +27,12 @@ public class PantherModule extends ReactContextBaseJavaModule {
     private static native String validateMulti(String prompt, String providersJson);
     private static native String version();
     private static native String validateMultiWithProof(String prompt, String providersJson);
+    private static native String validateCustomWithProof(String prompt, String providersJson, String guidelinesJson);
+    private static native String validateOpenAI(String prompt, String apiKey, String model, String base);
+    private static native String validateOllama(String prompt, String base, String model);
+    private static native String validateCustom(String prompt, String providersJson, String guidelinesJson);
+    private static native int tokenCount(String text);
+    private static native double calculateCost(int tokensIn, int tokensOut, String providerName, String costRulesJson);
 
     @ReactMethod
     public void init(Promise promise) {
@@ -78,5 +84,35 @@ public class PantherModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void validateMultiWithProof(String prompt, String providersJson, Promise promise) {
         promise.resolve(validateMultiWithProof(prompt, providersJson));
+    }
+
+    @ReactMethod
+    public void validateCustomWithProof(String prompt, String providersJson, String guidelinesJson, Promise promise) {
+        promise.resolve(validateCustomWithProof(prompt, providersJson, guidelinesJson));
+    }
+
+    @ReactMethod
+    public void validateOpenAI(String prompt, String apiKey, String model, String base, Promise promise) {
+        promise.resolve(validateOpenAI(prompt, apiKey, model, base));
+    }
+
+    @ReactMethod
+    public void validateOllama(String prompt, String base, String model, Promise promise) {
+        promise.resolve(validateOllama(prompt, base, model));
+    }
+
+    @ReactMethod
+    public void validateCustom(String prompt, String providersJson, String guidelinesJson, Promise promise) {
+        promise.resolve(validateCustom(prompt, providersJson, guidelinesJson));
+    }
+
+    @ReactMethod
+    public void tokenCount(String text, Promise promise) {
+        promise.resolve(tokenCount(text));
+    }
+
+    @ReactMethod
+    public void calculateCost(int tokensIn, int tokensOut, String providerName, String costRulesJson, Promise promise) {
+        promise.resolve(calculateCost(tokensIn, tokensOut, providerName, costRulesJson));
     }
 }

@@ -3,11 +3,32 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'ffi.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const MyApp());
-}
+void main() => runApp(const MyApp());
+
+const defaultCostRulesJson = '[\n'
+    '  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.15, "usd_per_1k_out": 0.60},\n'
+    '  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.30, "usd_per_1k_out": 1.20},\n'
+    '  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
+    '  {"match": "openai:gpt-4o",       "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
+    '  {"match": "openai:chatgpt-5",    "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
+    '  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},\n'
+    '  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},\n'
+    '  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00}\n'
+    ']';
+const openAIModels = [
+  'gpt-4o-mini',
+  'gpt-4.1-mini',
+  'gpt-4.1',
+  'gpt-4o',
+  'chatgpt-5',
+];
+const ollamaModels = [
+  'llama3',
+  'phi3',
+  'mistral',
+];
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -17,19 +38,11 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final panther = PantherFFI();
-  String output = '';
-  String reference = '';
-  double bleu = 0;
   List<String> validationLines = [];
   String? proofHash;
-feature/ProofSeal
   String? explorerUrl;
   String? contractUrl;
   String? anchorStatus;
-  String? explorerUrl;
-
-  String? anchorStatus;
- main
 
   final List<Map<String, dynamic>> providerPresets = [
     {'label': 'OpenAI', 'type': 'openai', 'base': 'https://api.openai.com', 'model': 'gpt-4o-mini', 'requiresKey': true},
@@ -54,7 +67,20 @@ feature/ProofSeal
   late TextEditingController plagCorpusController;
   late TextEditingController plagCandidateController;
   late TextEditingController plagNgramController;
+  late TextEditingController costRulesController;
+  late TextEditingController openAIBaseController;
+  late TextEditingController openAIModelController;
+  late TextEditingController openAIKeyController;
+  late TextEditingController ollamaBaseController;
+  late TextEditingController ollamaModelController;
+  late TextEditingController guidelinesController;
+  late TextEditingController guidelinesUrlController;
   double? plagScore;
+  double? trustIndex;
+  double? biasScore;
+  List<dynamic> lastResults = [];
+  String mode = 'proof'; // single | multi | proof
+  String provider = 'openai'; // openai | ollama | default
 
   @override
   void initState() {
@@ -71,6 +97,20 @@ feature/ProofSeal
     plagCorpusController = TextEditingController(text: 'Insulin regulates glucose in the blood.\nVitamin C supports the immune system.');
     plagCandidateController = TextEditingController(text: 'Insulin regulates glucose in the blood.');
     plagNgramController = TextEditingController(text: '3');
+    costRulesController = TextEditingController(text: defaultCostRulesJson);
+    openAIBaseController = TextEditingController(text: 'https://api.openai.com');
+    openAIModelController = TextEditingController(text: 'gpt-4o-mini');
+    openAIKeyController = TextEditingController();
+    ollamaBaseController = TextEditingController(text: 'http://127.0.0.1:11434');
+    ollamaModelController = TextEditingController(text: 'llama3');
+    guidelinesController = TextEditingController();
+    guidelinesUrlController = TextEditingController();
+    SharedPreferences.getInstance().then((prefs) {
+      final s = prefs.getString('panther.cost_rules');
+      if (s != null && s.trim().isNotEmpty) {
+        setState(() { costRulesController.text = s; });
+      }
+    });
   }
 
   @override
@@ -86,6 +126,14 @@ feature/ProofSeal
     plagCorpusController.dispose();
     plagCandidateController.dispose();
     plagNgramController.dispose();
+    costRulesController.dispose();
+    openAIBaseController.dispose();
+    openAIModelController.dispose();
+    openAIKeyController.dispose();
+    ollamaBaseController.dispose();
+    ollamaModelController.dispose();
+    guidelinesController.dispose();
+    guidelinesUrlController.dispose();
     super.dispose();
   }
 
@@ -132,23 +180,49 @@ feature/ProofSeal
       });
     }
 
-    final raw = panther.validateMultiWithProof(prompt, jsonEncode(providers));
+    String raw;
+    if (mode == 'single') {
+      if (provider == 'openai') {
+        raw = panther.validateOpenAI(prompt, openAIKeyController.text.trim(), openAIModelController.text.trim(), openAIBaseController.text.trim());
+      } else if (provider == 'ollama') {
+        raw = panther.validateOllama(prompt, ollamaBaseController.text.trim(), ollamaModelController.text.trim());
+      } else {
+        raw = panther.validate(prompt);
+      }
+    } else {
+      final pjson = jsonEncode(providers);
+      if (mode == 'multi') {
+        raw = (guidelinesController.text.trim().isNotEmpty)
+            ? panther.validateCustom(prompt, pjson, guidelinesController.text.trim())
+            : panther.validateMulti(prompt, pjson);
+      } else {
+        raw = (guidelinesController.text.trim().isNotEmpty)
+            ? panther.validateCustomWithProof(prompt, pjson, guidelinesController.text.trim())
+            : panther.validateMultiWithProof(prompt, pjson);
+      }
+    }
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map && decoded.containsKey('results')) {
         final results = decoded['results'] as List<dynamic>;
+        final tin = panther.tokenCount(prompt);
         setState(() {
           validationLines = results.map((entry) {
             final name = entry['provider_name'] ?? '?';
             final score = (entry['adherence_score'] ?? 0).toDouble();
             final latency = entry['latency_ms'] ?? 0;
-            return '$name – ${score.toStringAsFixed(1)}% – $latency ms';
+            final text = entry['raw_text'] is String ? (entry['raw_text'] as String) : '';
+            final tout = panther.tokenCount(text);
+            final rules = (costRulesController.text.trim().isEmpty) ? defaultCostRulesJson : costRulesController.text;
+            final cost = panther.calculateCost(tin, tout, '$name', rules);
+            return '$name – ${score.toStringAsFixed(1)}% – $latency ms – $tin/$tout tok – \$${cost.toStringAsFixed(4)}';
           }).cast<String>().toList();
           final proof = decoded['proof'] as Map<String, dynamic>?;
           if (proof != null && proof['combined_hash'] is String) {
             proofHash = proof['combined_hash'] as String;
             validationLines.add('Proof: $proofHash');
           }
+          lastResults = results;
         });
         return;
       }
@@ -166,19 +240,113 @@ feature/ProofSeal
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    output = panther.generate('hello from flutter');
-                  });
-                },
-                child: const Text('Generate'),
-              ),
+              Text('PantherSDK Flutter Sample', style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
+              const Text('Compliance (Bias)'),
+              const SizedBox(height: 4),
+              Row(children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      // Use validation lines as samples for simplicity
+                      final samples = validationLines;
+                      final res = panther.biasDetect(samples);
+                      final obj = jsonDecode(res) as Map<String, dynamic>;
+                      final b = (obj['bias_score'] as num?)?.toDouble();
+                      double avg = 0.0;
+                      if (lastResults.isNotEmpty) {
+                        final vals = lastResults.map((e) => ((e['adherence_score'] ?? 0) as num).toDouble()/100.0).toList();
+                        avg = vals.isNotEmpty ? (vals.reduce((a,b)=>a+b) / vals.length) : 0.0;
+                      }
+                      setState(() {
+                        biasScore = b;
+                        trustIndex = (b == null) ? avg : (avg * (1.0 - b)).clamp(0.0, 1.0);
+                      });
+                    } catch (_) {}
+                  },
+                  child: const Text('Analyze Bias'),
+                ),
+                const SizedBox(width: 12),
+                if (biasScore != null) Text('bias_score: ${biasScore!.toStringAsFixed(3)}'),
+                const SizedBox(width: 12),
+                if (trustIndex != null) Text('trust_index: ${(trustIndex!*100).toStringAsFixed(1)}%'),
+              ]),
               TextField(
                 controller: promptController,
                 decoration: const InputDecoration(labelText: 'Prompt'),
               ),
+              const SizedBox(height: 12),
+              const Text('Execution'),
+              Row(children: [
+                ChoiceChip(label: const Text('Single'), selected: mode=='single', onSelected: (_){ setState(()=> mode='single'); }),
+                const SizedBox(width: 8),
+                ChoiceChip(label: const Text('Multi'), selected: mode=='multi', onSelected: (_){ setState(()=> mode='multi'); }),
+                const SizedBox(width: 8),
+                ChoiceChip(label: const Text('With Proof'), selected: mode=='proof', onSelected: (_){ setState(()=> mode='proof'); }),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                ChoiceChip(label: const Text('OpenAI'), selected: provider=='openai', onSelected: (_){ setState(()=> provider='openai'); }),
+                const SizedBox(width: 8),
+                ChoiceChip(label: const Text('Ollama'), selected: provider=='ollama', onSelected: (_){ setState(()=> provider='ollama'); }),
+                const SizedBox(width: 8),
+                ChoiceChip(label: const Text('Default'), selected: provider=='default', onSelected: (_){ setState(()=> provider='default'); }),
+              ]),
+              if (provider=='openai') ...[
+                TextField(controller: openAIKeyController, decoration: const InputDecoration(labelText: 'OpenAI API Key'), obscureText: true),
+                const SizedBox(height: 8),
+                TextField(controller: openAIBaseController, decoration: const InputDecoration(labelText: 'Base URL')),
+                const SizedBox(height: 8),
+                TextField(controller: openAIModelController, decoration: const InputDecoration(labelText: 'Model (e.g., gpt-4o-mini)')),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: openAIModels.map((m) => ChoiceChip(
+                    label: Text(m),
+                    selected: openAIModelController.text.trim()==m,
+                    onSelected: (_){ setState(()=> openAIModelController.text=m); },
+                  )).toList(),
+                ),
+              ]
+              else if (provider=='ollama') ...[
+                TextField(controller: ollamaBaseController, decoration: const InputDecoration(labelText: 'Ollama Base (http://127.0.0.1:11434)')),
+                const SizedBox(height: 8),
+                TextField(controller: ollamaModelController, decoration: const InputDecoration(labelText: 'Ollama Model (e.g., llama3)')),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: ollamaModels.map((m) => ChoiceChip(
+                    label: Text(m),
+                    selected: ollamaModelController.text.trim()==m,
+                    onSelected: (_){ setState(()=> ollamaModelController.text=m); },
+                  )).toList(),
+                ),
+              ]
+              else ...[
+                const Text('Using environment providers (Default)', style: TextStyle(color: Colors.grey)),
+              ],
+              const SizedBox(height: 8),
+              const Text('Guidelines'),
+              TextField(
+                controller: guidelinesController,
+                minLines: 3,
+                maxLines: 8,
+                decoration: const InputDecoration(hintText: '[ { "topic": ..., "expected_terms": [...] } ]', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 6),
+              Row(children: [
+                Expanded(child: TextField(controller: guidelinesUrlController, decoration: const InputDecoration(hintText: 'https://…/guidelines.json', border: OutlineInputBorder()))),
+                const SizedBox(width: 8),
+                ElevatedButton(onPressed: () async {
+                  try {
+                    final client = HttpClient();
+                    final req = await client.getUrl(Uri.parse(guidelinesUrlController.text.trim()));
+                    final resp = await req.close();
+                    final body = await resp.transform(const Utf8Decoder()).join();
+                    setState(() { guidelinesController.text = body; });
+                  } catch (_) {}
+                }, child: const Text('Load'))
+              ]),
               const SizedBox(height: 12),
               DropdownButton<String>(
                 value: selectedPreset,
@@ -230,6 +398,44 @@ feature/ProofSeal
               ],
               const SizedBox(height: 12),
               const Text('Backend API'),
+              const SizedBox(height: 8),
+              const Text('Cost Rules (JSON)'),
+              Row(children: [
+                ElevatedButton(
+                  onPressed: () => setState(() { costRulesController.text = defaultCostRulesJson; }),
+                  child: const Text('Restore Default'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('panther.cost_rules', costRulesController.text);
+                  },
+                  child: const Text('Save'),
+                ),
+              ]),
+              const SizedBox(height: 6),
+              TextField(
+                controller: costRulesController,
+                minLines: 4,
+                maxLines: 12,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 8),
+              const Text('Cost Rules (JSON)'),
+              Row(children: [
+                ElevatedButton(
+                  onPressed: () => setState(() { costRulesController.text = defaultCostRulesJson; }),
+                  child: const Text('Restore Default'),
+                ),
+              ]),
+              const SizedBox(height: 6),
+              TextField(
+                controller: costRulesController,
+                minLines: 4,
+                maxLines: 12,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
               TextField(
                 controller: apiBaseController,
                 decoration: const InputDecoration(labelText: 'API Base (e.g., http://127.0.0.1:8000)'),
@@ -256,7 +462,6 @@ feature/ProofSeal
                   onPressed: _checkStatus,
                   child: const Text('Check Status (API)'),
                 ),
-feature/ProofSeal
                 if (explorerUrl != null) ...[
                   const SizedBox(height: 8),
                   ElevatedButton(
@@ -281,8 +486,6 @@ feature/ProofSeal
                     child: const Text('View Contract'),
                   ),
                 ],
-
-main
               ],
 
               const SizedBox(height: 16),
@@ -331,22 +534,26 @@ main
                 ],
               ),
               const SizedBox(height: 16),
+              const SizedBox(height: 16),
+              const Text('Compliance (Bias):'),
               TextField(
-                decoration: const InputDecoration(labelText: 'Reference (BLEU)'),
-                onChanged: (v) => reference = v,
+                controller: TextEditingController(text: ''),
+                onChanged: (_) {},
+                decoration: const InputDecoration(hintText: 'Enter responses (one per line)', border: OutlineInputBorder()),
+                minLines: 3,
+                maxLines: 5,
+                onSubmitted: (_) {},
               ),
               const SizedBox(height: 8),
               ElevatedButton(
                 onPressed: () {
-                  setState(() {
-                    bleu = panther.metricsBleu(reference, output);
-                  });
+                  // For simplicity, reuse validation lines as samples
+                  final samples = validationLines;
+                  final res = panther.biasDetect(samples);
+                  setState(() { validationLines.add('Bias: $res'); });
                 },
-                child: const Text('BLEU'),
+                child: const Text('Analyze Bias'),
               ),
-              const SizedBox(height: 16),
-              Text('Output: $output'),
-              Text('BLEU: ${bleu.toStringAsFixed(3)}'),
               const SizedBox(height: 16),
               const Text('Validation:'),
               ...validationLines.map((line) => Text(line)).toList(),
@@ -401,17 +608,12 @@ main
       final resp = await req.close();
       final body = await resp.transform(utf8.decoder).join();
       final obj = jsonDecode(body) as Map<String, dynamic>;
-feature/ProofSeal
       final anchored = (obj['anchored'] as bool?) ?? false;
       final cu = obj['contract_url'] as String?;
       setState(() {
         anchorStatus = 'Anchored: ${anchored ? 'true' : 'false'}';
         contractUrl = cu;
       });
-
-      final anchored = obj['anchored'] as bool? ?? false;
-      setState(() { anchorStatus = 'Anchored: $anchored'; });
-main
     } catch (e) {
       setState(() { anchorStatus = 'Status error: $e'; });
     } finally {

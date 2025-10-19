@@ -94,10 +94,92 @@ Java_com_example_panther_PantherModule_validateMultiWithProof(JNIEnv* env, jclas
 }
 
 JNIEXPORT jstring JNICALL
+Java_com_example_panther_PantherModule_validateCustomWithProof(JNIEnv* env, jclass clazz, jstring prompt, jstring providersJson, jstring guidelinesJson) {
+    (void)clazz;
+    const char* p = (*env)->GetStringUTFChars(env, prompt, 0);
+    const char* j = (*env)->GetStringUTFChars(env, providersJson, 0);
+    const char* g = (*env)->GetStringUTFChars(env, guidelinesJson, 0);
+    char* out = panther_validation_run_custom_with_proof(p, j, g);
+    (*env)->ReleaseStringUTFChars(env, prompt, p);
+    (*env)->ReleaseStringUTFChars(env, providersJson, j);
+    (*env)->ReleaseStringUTFChars(env, guidelinesJson, g);
+    jstring result = (*env)->NewStringUTF(env, out);
+    panther_free_string(out);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_example_panther_PantherModule_validateOpenAI(JNIEnv* env, jclass clazz, jstring prompt, jstring apiKey, jstring model, jstring base) {
+    (void)clazz;
+    const char* p = (*env)->GetStringUTFChars(env, prompt, 0);
+    const char* k = (*env)->GetStringUTFChars(env, apiKey, 0);
+    const char* m = (*env)->GetStringUTFChars(env, model, 0);
+    const char* b = (*env)->GetStringUTFChars(env, base, 0);
+    char* out = panther_validation_run_openai(p, k, m, b);
+    (*env)->ReleaseStringUTFChars(env, prompt, p);
+    (*env)->ReleaseStringUTFChars(env, apiKey, k);
+    (*env)->ReleaseStringUTFChars(env, model, m);
+    (*env)->ReleaseStringUTFChars(env, base, b);
+    jstring result = (*env)->NewStringUTF(env, out);
+    panther_free_string(out);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_example_panther_PantherModule_validateOllama(JNIEnv* env, jclass clazz, jstring prompt, jstring base, jstring model) {
+    (void)clazz;
+    const char* p = (*env)->GetStringUTFChars(env, prompt, 0);
+    const char* b = (*env)->GetStringUTFChars(env, base, 0);
+    const char* m = (*env)->GetStringUTFChars(env, model, 0);
+    char* out = panther_validation_run_ollama(p, b, m);
+    (*env)->ReleaseStringUTFChars(env, prompt, p);
+    (*env)->ReleaseStringUTFChars(env, base, b);
+    (*env)->ReleaseStringUTFChars(env, model, m);
+    jstring result = (*env)->NewStringUTF(env, out);
+    panther_free_string(out);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_example_panther_PantherModule_validateCustom(JNIEnv* env, jclass clazz, jstring prompt, jstring providersJson, jstring guidelinesJson) {
+    (void)clazz;
+    const char* p = (*env)->GetStringUTFChars(env, prompt, 0);
+    const char* j = (*env)->GetStringUTFChars(env, providersJson, 0);
+    const char* g = (*env)->GetStringUTFChars(env, guidelinesJson, 0);
+    char* out = panther_validation_run_custom(p, j, g);
+    (*env)->ReleaseStringUTFChars(env, prompt, p);
+    (*env)->ReleaseStringUTFChars(env, providersJson, j);
+    (*env)->ReleaseStringUTFChars(env, guidelinesJson, g);
+    jstring result = (*env)->NewStringUTF(env, out);
+    panther_free_string(out);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
 Java_com_example_panther_PantherModule_version(JNIEnv* env, jclass clazz) {
     (void)clazz;
     char* out = panther_version_string();
     jstring result = (*env)->NewStringUTF(env, out);
     panther_free_string(out);
     return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_example_panther_PantherModule_tokenCount(JNIEnv* env, jclass clazz, jstring text) {
+    (void)clazz;
+    const char* t = (*env)->GetStringUTFChars(env, text, 0);
+    int32_t n = panther_token_count(t);
+    (*env)->ReleaseStringUTFChars(env, text, t);
+    return (jint)n;
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_example_panther_PantherModule_calculateCost(JNIEnv* env, jclass clazz, jint tokensIn, jint tokensOut, jstring providerName, jstring costRulesJson) {
+    (void)clazz;
+    const char* p = (*env)->GetStringUTFChars(env, providerName, 0);
+    const char* r = (*env)->GetStringUTFChars(env, costRulesJson, 0);
+    double cost = panther_calculate_cost((int32_t)tokensIn, (int32_t)tokensOut, p, r);
+    (*env)->ReleaseStringUTFChars(env, providerName, p);
+    (*env)->ReleaseStringUTFChars(env, costRulesJson, r);
+    return cost;
 }

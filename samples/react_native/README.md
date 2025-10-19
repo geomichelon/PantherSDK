@@ -12,6 +12,8 @@ API exposed by native module `PantherModule`:
 - `validateMulti(prompt, providersJson)` -> JSON array of results
 - `validateMultiWithProof(prompt, providersJson)` -> `{ results, proof }` (Stage 1)
 - `version()` -> SDK version string
+- `tokenCount(text)` -> number of whitespace tokens (heuristic)
+- `calculateCost(tokensIn, tokensOut, providerName, costRulesJson)` -> estimated cost in USD
 
 Agents helpers (HTTP, Stage 6) in `Panther.ts`:
 - `runAgent(plan, input, apiBase?, apiKey?, asyncRun=true)` -> `{ run_id, status? } | { result }`
@@ -31,7 +33,7 @@ What this sample does
 iOS (Objective‑C module)
 1) Build iOS static lib + header
 - `rustup target add aarch64-apple-ios-sim`
-- `cargo build -p panther-ffi --release --target aarch64-apple-ios-sim`
+- `cargo build -p panther-ffi --release --target aarch64-apple-ios-sim --features "validation validation-openai validation-ollama metrics-inmemory"`
 - `cbindgen --crate panther-ffi --output ./panther.h`
 2) Add to RN iOS project
 - Add `libpanther_ffi.a` to the Xcode project (Link Binary With Libraries).
@@ -42,7 +44,7 @@ iOS (Objective‑C module)
 
 Android (Java + JNI module)
 1) Build shared lib for emulator
-- `cargo ndk -t x86_64 -o android/app/src/main/jniLibs build -p panther-ffi --release`
+- `cargo ndk -t x86_64 -o android/app/src/main/jniLibs build -p panther-ffi --release --features "validation validation-openai validation-ollama metrics-inmemory"`
 2) JNI wrapper
 - Add `samples/react_native/android/panther_jni.c` to your RN Android module via `externalNativeBuild`.
 3) Java module
@@ -59,6 +61,7 @@ Example UI (AppSample.tsx)
   - Providers JSON field (defaults to OpenAI‑compatible entry)
   - Backend API Base + API Key inputs
   - Buttons: Validate (calls `validateMultiWithProof`) and Anchor Proof (calls `/proof/anchor` on your API). You can also wire um botão para `startAgent({type:'ValidateSealAnchor'}, {prompt, providers})` e alternar entre SSE e polling com o toggle “Use SSE”.
+  - Token/Cost: shows `tokens_in/tokens_out` and an estimated cost using `tokenCount` + `calculateCost` with an embedded pricing table (editable in code).
 
 SSE in React Native (optional)
 - Install: `npm i react-native-event-source` (or `yarn add react-native-event-source`)

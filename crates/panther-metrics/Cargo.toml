@@ -7,3 +7,10 @@ edition.workspace = true
 anyhow.workspace = true
 panther-domain = { path = "../panther-domain" }
 
+[features]
+default = []
+prometheus-exporter = ["dep:prometheus"]
+
+[dependencies.prometheus]
+version = "0.13"
+optional = true

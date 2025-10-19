@@ -13,6 +13,8 @@ use std::os::raw::c_char;
 static ENGINE: OnceCell<Engine> = OnceCell::new();
 static LOGS: OnceCell<std::sync::Mutex<Vec<String>>> = OnceCell::new();
 static STORAGE: OnceCell<Arc<dyn KeyValueStore>> = OnceCell::new();
+#[cfg(feature = "metrics-prometheus")]
+static PROM: OnceCell<Arc<panther_metrics::PrometheusMetrics>> = OnceCell::new();
 
 #[no_mangle]
 pub extern "C" fn panther_init() -> i32 {
@@ -23,12 +25,19 @@ pub extern "C" fn panther_init() -> i32 {
     let engine = Engine::new(provider, telemetry);
 
     // Conditionally augment the engine without mutable bindings by shadowing
-    #[cfg(feature = "metrics-inmemory")]
+    #[cfg(any(feature = "metrics-inmemory", feature = "metrics-prometheus"))]
     let engine = {
-        let metrics = Arc::new(panther_metrics::InMemoryMetrics::default());
+        #[cfg(feature = "metrics-prometheus")]
+        let metrics = {
+            let m = Arc::new(panther_metrics::PrometheusMetrics::default());
+            let _ = PROM.set(m.clone());
+            m as Arc<dyn panther_domain::ports::MetricsSink>
+        };
+        #[cfg(all(not(feature = "metrics-prometheus"), feature = "metrics-inmemory"))]
+        let metrics = Arc::new(panther_metrics::InMemoryMetrics::default()) as Arc<dyn panther_domain::ports::MetricsSink>;
         engine.with_metrics(metrics)
     };
-    #[cfg(not(feature = "metrics-inmemory"))]
+    #[cfg(not(any(feature = "metrics-inmemory", feature = "metrics-prometheus")))]
     let engine = engine;
 
     #[cfg(feature = "storage-inmemory")]
@@ -455,9 +464,11 @@ pub extern "C" fn panther_validation_run_custom_with_proof(
         Ok(r) => r,
         Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
     };
+    let prompt_clone2 = prompt.clone();
+    let guidelines_json_clone2 = guidelines_json.clone();
     let res = rt.block_on(async move {
-        let validator = panther_validation::LLMValidator::from_json_str(&guidelines_json, providers)?;
-        let results = validator.validate(&prompt).await?;
+        let validator = panther_validation::LLMValidator::from_json_str(&guidelines_json_clone2, providers)?;
+        let results = validator.validate(&prompt_clone2).await?;
         Ok::<Vec<panther_validation::ValidationResult>, anyhow::Error>(results)
     });
     match res {
@@ -605,9 +616,10 @@ pub extern "C" fn panther_validation_run_multi_with_proof(
         Ok(r) => r,
         Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
     };
+    let prompt_clone2 = prompt.clone();
     let res = rt.block_on(async move {
         let validator = panther_validation::LLMValidator::from_json_str(guidelines_json, providers)?;
-        let results = validator.validate(&prompt).await?;
+        let results = validator.validate(&prompt_clone2).await?;
         Ok::<Vec<panther_validation::ValidationResult>, anyhow::Error>(results)
     });
     match res {
@@ -625,69 +637,7 @@ pub extern "C" fn panther_validation_run_multi_with_proof(
     }
 }
 
-#[cfg(feature = "validation")]
-#[no_mangle]
-pub extern "C" fn panther_validation_run_custom_with_proof(
-    prompt_c: *const c_char,
-    providers_json_c: *const c_char,
-    guidelines_json_c: *const c_char,
-) -> *mut std::os::raw::c_char {
-    let prompt = unsafe { CStr::from_ptr(prompt_c).to_string_lossy().into_owned() };
-    let providers_json = unsafe { CStr::from_ptr(providers_json_c).to_string_lossy().into_owned() };
-    let guidelines_json = unsafe { CStr::from_ptr(guidelines_json_c).to_string_lossy().into_owned() };
-
-    #[derive(serde::Deserialize)]
-    struct ProviderCfg { #[serde(rename = "type")] ty: String, base_url: Option<String>, model: Option<String>, api_key: Option<String> }
-    let cfgs: Result<Vec<ProviderCfg>, _> = serde_json::from_str(&providers_json);
-    if let Err(e) = cfgs { return rust_string_to_c(format!("{{\"error\":\"providers json invalid: {}\"}}", e)); }
-    let cfgs = cfgs.unwrap();
-
-    let mut providers: Vec<(String, Arc<dyn panther_domain::ports::LlmProvider>)> = Vec::new();
-    for c in cfgs {
-        match c.ty.as_str() {
-            #[cfg(feature = "validation-openai")]
-            "openai" => {
-                if let (Some(key), Some(model)) = (c.api_key.clone(), c.model.clone()) {
-                    let base = c.base_url.unwrap_or_else(|| "https://api.openai.com".to_string());
-                    let p = panther_providers::openai::OpenAiProvider { api_key: key, model: model.clone(), base_url: base };
-                    providers.push((format!("openai:{}", model), Arc::new(p)));
-                }
-            }
-            #[cfg(feature = "validation-ollama")]
-            "ollama" => {
-                if let (Some(base), Some(model)) = (c.base_url.clone(), c.model.clone()) {
-                    let p = panther_providers::ollama::OllamaProvider { base_url: base, model: model.clone() };
-                    providers.push((format!("ollama:{}", model), Arc::new(p)));
-                }
-            }
-            _ => {}
-        }
-    }
-    if providers.is_empty() { return rust_string_to_c("{\"error\":\"no providers configured\"}".to_string()); }
-
-    let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
-        Ok(r) => r,
-        Err(_) => return rust_string_to_c("{\"error\":\"runtime init failed\"}".to_string()),
-    };
-    let res = rt.block_on(async move {
-        let validator = panther_validation::LLMValidator::from_json_str(&guidelines_json, providers)?;
-        let results = validator.validate(&prompt).await?;
-        Ok::<Vec<panther_validation::ValidationResult>, anyhow::Error>(results)
-    });
-    match res {
-        Ok(results) => {
-            let results_json = serde_json::to_string(&results).unwrap_or_else(|_| "[]".to_string());
-            let ctx = panther_validation::proof::ProofContext { sdk_version: env!("CARGO_PKG_VERSION").to_string(), salt: None };
-            let proof = match panther_validation::proof::compute_proof(&prompt, &providers_json, &guidelines_json, &results_json, &ctx) {
-                Ok(p) => p,
-                Err(e) => return rust_string_to_c(format!("{{\"error\":\"compute proof failed: {}\"}}", e)),
-            };
-            let out = serde_json::json!({ "results": results, "proof": proof });
-            rust_string_to_c(serde_json::to_string(&out).unwrap_or_else(|_| "{}".to_string()))
-        }
-        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
-    }
-}
+// (Removed duplicate panther_validation_run_custom_with_proof implementation)
 
 #[cfg(feature = "validation")]
 #[no_mangle]
@@ -978,4 +928,14 @@ pub extern "C" fn panther_validation_run_custom(
         Ok::<String, anyhow::Error>(serde_json::to_string(&results)? )
     });
     match res { Ok(s) => rust_string_to_c(s), Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)), }
+}
+// Prometheus scrape (Rust exporter)
+#[cfg(feature = "metrics-prometheus")]
+#[no_mangle]
+pub extern "C" fn panther_prometheus_scrape() -> *mut std::os::raw::c_char {
+    if let Some(prom) = PROM.get() {
+        let s = prom.scrape();
+        return rust_string_to_c(s);
+    }
+    rust_string_to_c(String::new())
 }

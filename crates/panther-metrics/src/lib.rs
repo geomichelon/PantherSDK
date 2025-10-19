@@ -28,6 +28,57 @@ impl InMemoryMetrics {
     }
 }
 
+// Prometheus exporter (optional)
+#[cfg(feature = "prometheus-exporter")]
+pub struct PrometheusMetrics {
+    registry: prometheus::Registry,
+    counters: Mutex<HashMap<String, prometheus::IntCounter>>, 
+    histograms: Mutex<HashMap<String, prometheus::Histogram>>, 
+}
+
+#[cfg(feature = "prometheus-exporter")]
+impl Default for PrometheusMetrics {
+    fn default() -> Self {
+        Self { registry: prometheus::Registry::new(), counters: Mutex::new(HashMap::new()), histograms: Mutex::new(HashMap::new()) }
+    }
+}
+
+#[cfg(feature = "prometheus-exporter")]
+impl MetricsSink for PrometheusMetrics {
+    fn inc_counter(&self, name: &str, value: f64) {
+        let mut map = self.counters.lock().unwrap();
+        let ctr = map.entry(name.to_string()).or_insert_with(|| {
+            let c = prometheus::IntCounter::new(name.to_string(), name.to_string()).unwrap();
+            self.registry.register(Box::new(c.clone())).ok();
+            c
+        });
+        // IntCounter only supports i64 increments; round value safely
+        let v = value.round() as i64;
+        if v > 0 { ctr.inc_by(v as u64); }
+    }
+    fn observe_histogram(&self, name: &str, value: f64) {
+        let mut map = self.histograms.lock().unwrap();
+        let h = map.entry(name.to_string()).or_insert_with(|| {
+            let opts = prometheus::HistogramOpts::new(name.to_string(), name.to_string());
+            let h = prometheus::Histogram::with_opts(opts).unwrap();
+            self.registry.register(Box::new(h.clone())).ok();
+            h
+        });
+        h.observe(value);
+    }
+}
+
+#[cfg(feature = "prometheus-exporter")]
+impl PrometheusMetrics {
+    pub fn scrape(&self) -> String {
+        let metric_families = self.registry.gather();
+        let mut buf = Vec::new();
+        let enc = prometheus::TextEncoder::new();
+        enc.encode(&metric_families, &mut buf).ok();
+        String::from_utf8_lossy(&buf).to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,263 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+    A000000C0000000000000001 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000A0000000000000001 /* App.swift */; };
+    A000000D0000000000000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000B0000000000000001 /* ContentView.swift */; };
+    A000000F0000000000000001 /* PantherSDKIOS.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A000000E0000000000000001 /* PantherSDKIOS.xcframework */; };
+    A00000100000000000000001 /* PantherSDKIOS.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A000000E0000000000000001 /* PantherSDKIOS.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+    A00000200000000000000001 /* PantherBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001D0000000000000001 /* PantherBridge.swift */; };
+    A00000210000000000000001 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001E0000000000000001 /* Models.swift */; };
+    A00000220000000000000001 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001F0000000000000001 /* Components.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+    A00000150000000000000001 /* Embed Frameworks */ = {
+        isa = PBXCopyFilesBuildPhase;
+        buildActionMask = 2147483647;
+        dstPath = "";
+        dstSubfolderSpec = 10;
+        files = (
+            A00000100000000000000001 /* PantherSDK.xcframework in Embed Frameworks */,
+        );
+        name = "Embed Frameworks";
+        runOnlyForDeploymentPostprocessing = 0;
+    };
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+    A00000070000000000000001 /* PantherSDKSampleIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PantherSDKSampleIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+    A000000A0000000000000001 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+    A000000B0000000000000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+    A000000E0000000000000001 /* PantherSDKIOS.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = PantherSDKIOS.xcframework; path = PantherSDKIOS.xcframework; sourceTree = "<group>"; };
+    A000001D0000000000000001 /* PantherBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantherBridge.swift; sourceTree = "<group>"; };
+    A000001E0000000000000001 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+    A000001F0000000000000001 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+    A00000040000000000000001 /* Frameworks */ = {
+        isa = PBXFrameworksBuildPhase;
+        buildActionMask = 2147483647;
+        files = (
+            A000000F0000000000000001 /* PantherSDKIOS.xcframework in Frameworks */,
+        );
+        runOnlyForDeploymentPostprocessing = 0;
+    };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+    A00000060000000000000001 = {
+        isa = PBXGroup;
+        children = (
+            A00000160000000000000001 /* frameworkIOS */,
+            A00000090000000000000001 /* PantherSDKSampleIOS */,
+            A00000080000000000000001 /* Products */,
+        );
+        sourceTree = "<group>";
+    };
+    A00000080000000000000001 /* Products */ = {
+        isa = PBXGroup;
+        children = (
+            A00000070000000000000001 /* PantherSDKSampleIOS.app */,
+        );
+        name = Products;
+        sourceTree = "<group>";
+    };
+    A00000090000000000000001 /* PantherSDKSampleIOS */ = {
+        isa = PBXGroup;
+        children = (
+            A000000A0000000000000001 /* App.swift */,
+            A000000B0000000000000001 /* ContentView.swift */,
+            A000001D0000000000000001 /* PantherBridge.swift */,
+            A000001E0000000000000001 /* Models.swift */,
+            A000001F0000000000000001 /* Components.swift */,
+        );
+        path = PantherSDKSampleIOS;
+        sourceTree = "<group>";
+    };
+    A00000160000000000000001 /* frameworkIOS */ = {
+        isa = PBXGroup;
+        children = (
+            A000000E0000000000000001 /* PantherSDKIOS.xcframework */,
+        );
+        path = ../frameworkIOS;
+        sourceTree = "<group>";
+    };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+    A00000020000000000000001 /* PantherSDKSampleIOS */ = {
+        isa = PBXNativeTarget;
+        buildConfigurationList = A00000140000000000000001 /* Build configuration list for PBXNativeTarget "PantherSDKSampleIOS" */;
+        buildPhases = (
+            A00000030000000000000001 /* Sources */,
+            A00000040000000000000001 /* Frameworks */,
+            A00000050000000000000001 /* Resources */,
+            A00000150000000000000001 /* Embed Frameworks */,
+        );
+        buildRules = (
+        );
+        dependencies = (
+        );
+        name = PantherSDKSampleIOS;
+        productName = PantherSDKSampleIOS;
+        productReference = A00000070000000000000001 /* PantherSDKSampleIOS.app */;
+        productType = "com.apple.product-type.application";
+    };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+    A00000010000000000000001 /* Project object */ = {
+        isa = PBXProject;
+        attributes = {
+            BuildIndependentTargetsInParallel = 1;
+            LastSwiftUpdateCheck = 1500;
+            LastUpgradeCheck = 1500;
+        };
+        buildConfigurationList = A00000130000000000000001 /* Build configuration list for PBXProject "PantherSDKSampleIOS" */;
+        compatibilityVersion = "Xcode 15.0";
+        developmentRegion = en;
+        hasScannedForEncodings = 0;
+        knownRegions = (
+            en,
+            Base,
+        );
+        mainGroup = A00000060000000000000001;
+        productRefGroup = A00000080000000000000001 /* Products */;
+        projectDirPath = "";
+        projectRoot = "";
+        targets = (
+            A00000020000000000000001 /* PantherSDKSampleIOS */,
+        );
+    };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+    A00000050000000000000001 /* Resources */ = {
+        isa = PBXResourcesBuildPhase;
+        buildActionMask = 2147483647;
+        files = (
+        );
+        runOnlyForDeploymentPostprocessing = 0;
+    };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+    A00000030000000000000001 /* Sources */ = {
+        isa = PBXSourcesBuildPhase;
+        buildActionMask = 2147483647;
+        files = (
+            A000000C0000000000000001 /* App.swift in Sources */,
+            A000000D0000000000000001 /* ContentView.swift in Sources */,
+            A00000200000000000000001 /* PantherBridge.swift in Sources */,
+            A00000210000000000000001 /* Models.swift in Sources */,
+            A00000220000000000000001 /* Components.swift in Sources */,
+        );
+        runOnlyForDeploymentPostprocessing = 0;
+    };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+    A00000110000000000000001 /* Debug */ = {
+        isa = XCBuildConfiguration;
+        buildSettings = {
+            CLANG_ENABLE_MODULES = YES;
+            GENERATE_INFOPLIST_FILE = YES;
+            IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+            SDKROOT = iphoneos;
+            SWIFT_VERSION = 5.0;
+            TARGETED_DEVICE_FAMILY = "1,2";
+        };
+        name = Debug;
+    };
+    A00000120000000000000001 /* Release */ = {
+        isa = XCBuildConfiguration;
+        buildSettings = {
+            CLANG_ENABLE_MODULES = YES;
+            GENERATE_INFOPLIST_FILE = YES;
+            IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+            SDKROOT = iphoneos;
+            SWIFT_VERSION = 5.0;
+            TARGETED_DEVICE_FAMILY = "1,2";
+        };
+        name = Release;
+    };
+    A00000190000000000000001 /* Debug */ = {
+        isa = XCBuildConfiguration;
+        buildSettings = {
+            ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+            CODE_SIGN_STYLE = Automatic;
+            CURRENT_PROJECT_VERSION = 1;
+            DEVELOPMENT_TEAM = "";
+            ENABLE_PREVIEWS = YES;
+            FRAMEWORK_SEARCH_PATHS = (
+                "$(inherited)",
+                "$(PROJECT_DIR)/../frameworkIOS",
+            );
+            GENERATE_INFOPLIST_FILE = YES;
+            INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+            INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+            INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+            LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+            PRODUCT_BUNDLE_IDENTIFIER = com.globant.PantherSDKSampleIOS;
+            PRODUCT_NAME = "$(TARGET_NAME)";
+            SWIFT_EMIT_LOC_STRINGS = YES;
+            SWIFT_VERSION = 5.0;
+        };
+        name = Debug;
+    };
+    A000001A0000000000000001 /* Release */ = {
+        isa = XCBuildConfiguration;
+        buildSettings = {
+            ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+            CODE_SIGN_STYLE = Automatic;
+            CURRENT_PROJECT_VERSION = 1;
+            DEVELOPMENT_TEAM = "";
+            ENABLE_PREVIEWS = YES;
+            FRAMEWORK_SEARCH_PATHS = (
+                "$(inherited)",
+                "$(PROJECT_DIR)/../frameworkIOS",
+            );
+            GENERATE_INFOPLIST_FILE = YES;
+            INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+            INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+            INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+            LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+            PRODUCT_BUNDLE_IDENTIFIER = com.globant.PantherSDKSampleIOS;
+            PRODUCT_NAME = "$(TARGET_NAME)";
+            SWIFT_EMIT_LOC_STRINGS = YES;
+            SWIFT_VERSION = 5.0;
+        };
+        name = Release;
+    };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+    A00000130000000000000001 /* Build configuration list for PBXProject "PantherSDKSampleIOS" */ = {
+        isa = XCConfigurationList;
+        buildConfigurations = (
+            A00000110000000000000001 /* Debug */,
+            A00000120000000000000001 /* Release */,
+        );
+        defaultConfigurationIsVisible = 0;
+        defaultConfigurationName = Debug;
+    };
+    A00000140000000000000001 /* Build configuration list for PBXNativeTarget "PantherSDKSampleIOS" */ = {
+        isa = XCConfigurationList;
+        buildConfigurations = (
+            A00000190000000000000001 /* Debug */,
+            A000001A0000000000000001 /* Release */,
+        );
+        defaultConfigurationIsVisible = 0;
+        defaultConfigurationName = Debug;
+    };
+/* End XCConfigurationList section */
+
+    };
+    rootObject = A00000010000000000000001 /* Project object */;
+}

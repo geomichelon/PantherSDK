@@ -11,6 +11,12 @@ type PantherModuleType = {
   validateMulti(prompt: string, providersJson: string): Promise<string>;
   version(): Promise<string>;
   validateMultiWithProof(prompt: string, providersJson: string): Promise<string>;
+  validateCustomWithProof(prompt: string, providersJson: string, guidelinesJson: string): Promise<string>;
+  validateOpenAI(prompt: string, apiKey: string, model: string, base: string): Promise<string>;
+  validateOllama(prompt: string, base: string, model: string): Promise<string>;
+  validateCustom(prompt: string, providersJson: string, guidelinesJson: string): Promise<string>;
+  tokenCount(text: string): Promise<number>;
+  calculateCost(tokensIn: number, tokensOut: number, providerName: string, costRulesJson: string): Promise<number>;
 };
 
 const {PantherModule} = NativeModules as {PantherModule: PantherModuleType};
@@ -53,6 +59,30 @@ export async function version(): Promise<string> {
 
 export async function validateMultiWithProof(prompt: string, providersJson: string): Promise<string> {
   return PantherModule.validateMultiWithProof(prompt, providersJson);
+}
+
+export async function validateCustomWithProof(prompt: string, providersJson: string, guidelinesJson: string): Promise<string> {
+  return PantherModule.validateCustomWithProof(prompt, providersJson, guidelinesJson);
+}
+
+export async function validateOpenAI(prompt: string, apiKey: string, model: string, base: string): Promise<string> {
+  return PantherModule.validateOpenAI(prompt, apiKey, model, base);
+}
+
+export async function validateOllama(prompt: string, base: string, model: string): Promise<string> {
+  return PantherModule.validateOllama(prompt, base, model);
+}
+
+export async function validateCustom(prompt: string, providersJson: string, guidelinesJson: string): Promise<string> {
+  return PantherModule.validateCustom(prompt, providersJson, guidelinesJson);
+}
+
+export async function tokenCount(text: string): Promise<number> {
+  return PantherModule.tokenCount(text);
+}
+
+export async function calculateCost(tokensIn: number, tokensOut: number, providerName: string, costRulesJson: string): Promise<number> {
+  return PantherModule.calculateCost(tokensIn, tokensOut, providerName, costRulesJson);
 }
 
 export async function anchorProof(hash: string, apiBase?: string, apiKey?: string): Promise<{tx_hash?: string; error?: string}> {
@@ -135,6 +165,19 @@ export async function evaluatePlagiarism(text: string, samples: string[], apiBas
       ...(apiKey ? {'X-API-Key': apiKey} : {}),
     },
     body: JSON.stringify({ metric: 'plagiarism', text, samples, ...(ngram ? {ngram} : {}) }),
+  });
+  return res.json();
+}
+
+export async function analyzeBias(samples: string[], apiBase?: string, apiKey?: string): Promise<{bias_score?: number; group_counts?: any; error?: string}> {
+  const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+  const res = await fetch(`${base}/bias/analyze`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    },
+    body: JSON.stringify({ samples }),
   });
   return res.json();
 }

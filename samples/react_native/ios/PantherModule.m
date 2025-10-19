@@ -10,7 +10,14 @@
  - (void)getLogs:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)validate:(NSString *)prompt resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)validateMultiWithProof:(NSString *)prompt providersJson:(NSString *)providersJson resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)validateOpenAI:(NSString *)prompt apiKey:(NSString *)apiKey model:(NSString *)model base:(NSString *)base resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)validateOllama:(NSString *)prompt base:(NSString *)base model:(NSString *)model resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)validateMulti:(NSString *)prompt providersJson:(NSString *)providersJson resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)validateCustom:(NSString *)prompt providersJson:(NSString *)providersJson guidelinesJson:(NSString *)guidelinesJson resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)validateCustomWithProof:(NSString *)prompt providersJson:(NSString *)providersJson guidelinesJson:(NSString *)guidelinesJson resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)version:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)tokenCount:(NSString *)text resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)calculateCost:(nonnull NSNumber *)tokensIn tokensOut:(nonnull NSNumber *)tokensOut providerName:(NSString *)providerName costRulesJson:(NSString *)costRulesJson resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
 @end
 
 @implementation PantherModule
@@ -93,6 +100,86 @@ RCT_REMAP_METHOD(validateMultiWithProof,
   resolve(res);
 }
 
+RCT_REMAP_METHOD(validateOpenAI,
+                 validateOpenAIPrompt:(NSString *)prompt
+                 apiKey:(NSString *)apiKey
+                 model:(NSString *)model
+                 base:(NSString *)base
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  const char* p = [prompt UTF8String];
+  const char* k = [apiKey UTF8String];
+  const char* m = [model UTF8String];
+  const char* b = [base UTF8String];
+  char* out = panther_validation_run_openai(p, k, m, b);
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+
+RCT_REMAP_METHOD(validateOllama,
+                 validateOllamaPrompt:(NSString *)prompt
+                 base:(NSString *)base
+                 model:(NSString *)model
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  const char* p = [prompt UTF8String];
+  const char* b = [base UTF8String];
+  const char* m = [model UTF8String];
+  char* out = panther_validation_run_ollama(p, b, m);
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+
+RCT_REMAP_METHOD(validateMulti,
+                 validateMultiPrompt:(NSString *)prompt
+                 providersJson:(NSString *)providersJson
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  const char* p = [prompt UTF8String];
+  const char* j = [providersJson UTF8String];
+  char* out = panther_validation_run_multi(p, j);
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+
+RCT_REMAP_METHOD(validateCustom,
+                 validateCustomPrompt:(NSString *)prompt
+                 providersJson:(NSString *)providersJson
+                 guidelinesJson:(NSString *)guidelinesJson
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  const char* p = [prompt UTF8String];
+  const char* j = [providersJson UTF8String];
+  const char* g = [guidelinesJson UTF8String];
+  char* out = panther_validation_run_custom(p, j, g);
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+
+RCT_REMAP_METHOD(validateCustomWithProof,
+                 validateCustomWithProofPrompt:(NSString *)prompt
+                 providersJson:(NSString *)providersJson
+                 guidelinesJson:(NSString *)guidelinesJson
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  const char* p = [prompt UTF8String];
+  const char* j = [providersJson UTF8String];
+  const char* g = [guidelinesJson UTF8String];
+  char* out = panther_validation_run_custom_with_proof(p, j, g);
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+
 RCT_REMAP_METHOD(getLogs,
                  getLogsWithResolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject)
@@ -101,6 +188,32 @@ RCT_REMAP_METHOD(getLogs,
   NSString* res = [NSString stringWithUTF8String:out];
   panther_free_string(out);
   resolve(res);
+}
+
+RCT_REMAP_METHOD(tokenCount,
+                 tokenCountWithText:(NSString *)text
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  if (text == nil) { resolve(@(0)); return; }
+  int32_t n = panther_token_count([text UTF8String]);
+  resolve(@(n));
+}
+
+RCT_REMAP_METHOD(calculateCost,
+                 calculateCostWithTokensIn:(nonnull NSNumber *)tokensIn
+                 tokensOut:(nonnull NSNumber *)tokensOut
+                 providerName:(NSString *)providerName
+                 costRulesJson:(NSString *)costRulesJson
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  const int32_t ti = (int32_t)[tokensIn intValue];
+  const int32_t to = (int32_t)[tokensOut intValue];
+  const char* pn = [providerName UTF8String];
+  const char* rj = [costRulesJson UTF8String];
+  double cost = panther_calculate_cost(ti, to, pn, rj);
+  resolve(@(cost));
 }
 
 RCT_REMAP_METHOD(version,

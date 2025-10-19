@@ -31,6 +31,14 @@ char* panther_storage_list_metrics(void);
 char* panther_logs_get(void);
 char* panther_logs_get_recent(void);
 
+// Tokenization and cost helpers (kept lightweight for samples)
+int32_t panther_token_count(const char* text);
+double panther_calculate_cost(int32_t tokens_in,
+                              int32_t tokens_out,
+                              const char* provider_name,
+                              const char* cost_rules_json);
+char* panther_get_token_metrics(void);
+
 #ifdef __cplusplus
 }
 #endif

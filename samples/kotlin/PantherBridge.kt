@@ -7,5 +7,24 @@ object PantherBridge {
 
     external fun pantherInit(): Int
     external fun pantherGenerate(prompt: String): String
-}
 
+    // Metrics
+    external fun metricsBleu(reference: String, candidate: String): Double
+    external fun metricsPlagiarism(corpusJson: String, candidate: String): Double
+    external fun metricsPlagiarismNgram(corpusJson: String, candidate: String, ngram: Int): Double
+
+    // Validation
+    external fun validate(prompt: String): String
+    external fun validateMulti(prompt: String, providersJson: String): String
+    external fun validateMultiWithProof(prompt: String, providersJson: String): String
+    external fun validateCustomWithProof(prompt: String, providersJson: String, guidelinesJson: String): String
+
+    // Storage/Logs/Version
+    external fun recordMetric(name: String): Int
+    external fun listStorageItems(): String
+    external fun getLogs(): String
+    external fun version(): String
+
+    // Compliance
+    external fun biasDetect(samplesJson: String): String
+}

@@ -12,6 +12,13 @@ typedef _c_validate = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>);
 typedef _c_validate_multi = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
 typedef _c_version = ffi.Pointer<ffi.Char> Function();
 typedef _c_validate_multi_with_proof = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_validate_custom_with_proof = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_bias_detect = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>);
+typedef _c_token_count = ffi.Int32 Function(ffi.Pointer<ffi.Char>);
+typedef _c_calculate_cost = ffi.Double Function(ffi.Int32, ffi.Int32, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_validate_openai = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_validate_ollama = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+typedef _c_validate_custom = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
 
 class PantherFFI {
   late final ffi.DynamicLibrary _lib;
@@ -25,6 +32,13 @@ class PantherFFI {
   late final _c_validate_multi _validateMulti;
   late final _c_version _version;
   late final _c_validate_multi_with_proof _validateMultiWithProof;
+  late final _c_validate_custom_with_proof _validateCustomWithProof;
+  late final _c_bias_detect _biasDetect;
+  late final _c_token_count _tokenCount;
+  late final _c_calculate_cost _calculateCost;
+  late final _c_validate_openai _validateOpenAI;
+  late final _c_validate_ollama _validateOllama;
+  late final _c_validate_custom _validateCustom;
 
   PantherFFI() {
     if (Platform.isAndroid) {
@@ -47,6 +61,13 @@ class PantherFFI {
     _validateMulti = _lib.lookupFunction<_c_validate_multi, _c_validate_multi>('panther_validation_run_multi');
     _version = _lib.lookupFunction<_c_version, _c_version>('panther_version_string');
     _validateMultiWithProof = _lib.lookupFunction<_c_validate_multi_with_proof, _c_validate_multi_with_proof>('panther_validation_run_multi_with_proof');
+    _validateCustomWithProof = _lib.lookupFunction<_c_validate_custom_with_proof, _c_validate_custom_with_proof>('panther_validation_run_custom_with_proof');
+    _biasDetect = _lib.lookupFunction<_c_bias_detect, _c_bias_detect>('panther_bias_detect');
+    _tokenCount = _lib.lookupFunction<_c_token_count, _c_token_count>('panther_token_count');
+    _calculateCost = _lib.lookupFunction<_c_calculate_cost, _c_calculate_cost>('panther_calculate_cost');
+    _validateOpenAI = _lib.lookupFunction<_c_validate_openai, _c_validate_openai>('panther_validation_run_openai');
+    _validateOllama = _lib.lookupFunction<_c_validate_ollama, _c_validate_ollama>('panther_validation_run_ollama');
+    _validateCustom = _lib.lookupFunction<_c_validate_custom, _c_validate_custom>('panther_validation_run_custom');
   }
 
   int init() => _init();
@@ -121,10 +142,81 @@ class PantherFFI {
     return result;
   }
 
+  String validateCustomWithProof(String prompt, String providersJson, String guidelinesJson) {
+    final p = prompt.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final j = providersJson.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final g = guidelinesJson.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final ptr = _validateCustomWithProof(p.cast(), j.cast(), g.cast());
+    pkg_ffi.malloc.free(p); pkg_ffi.malloc.free(j); pkg_ffi.malloc.free(g);
+    final result = ptr.cast<pkg_ffi.Utf8>().toDartString();
+    _free(ptr);
+    return result;
+  }
+
   String version() {
     final ptr = _version();
     final v = ptr.cast<pkg_ffi.Utf8>().toDartString();
     _free(ptr);
     return v;
+  }
+
+  String biasDetect(List<String> samples) {
+    final json = '[${samples.map((s) => '"${s.replaceAll('"', '\\"')}"').join(',')}]';
+    final cJson = json.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final ptr = _biasDetect(cJson.cast());
+    pkg_ffi.malloc.free(cJson);
+    final result = ptr.cast<pkg_ffi.Utf8>().toDartString();
+    _free(ptr);
+    return result;
+  }
+
+  int tokenCount(String text) {
+    final cText = text.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final n = _tokenCount(cText.cast());
+    pkg_ffi.malloc.free(cText);
+    return n;
+  }
+
+  double calculateCost(int tokensIn, int tokensOut, String providerName, String costRulesJson) {
+    final p = providerName.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final r = costRulesJson.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final cost = _calculateCost(tokensIn, tokensOut, p.cast(), r.cast());
+    pkg_ffi.malloc.free(p);
+    pkg_ffi.malloc.free(r);
+    return cost;
+  }
+
+  String validateOpenAI(String prompt, String apiKey, String model, String base) {
+    final p = prompt.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final k = apiKey.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final m = model.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final b = base.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final ptr = _validateOpenAI(p.cast(), k.cast(), m.cast(), b.cast());
+    pkg_ffi.malloc.free(p); pkg_ffi.malloc.free(k); pkg_ffi.malloc.free(m); pkg_ffi.malloc.free(b);
+    final result = ptr.cast<pkg_ffi.Utf8>().toDartString();
+    _free(ptr);
+    return result;
+  }
+
+  String validateOllama(String prompt, String base, String model) {
+    final p = prompt.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final b = base.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final m = model.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final ptr = _validateOllama(p.cast(), b.cast(), m.cast());
+    pkg_ffi.malloc.free(p); pkg_ffi.malloc.free(b); pkg_ffi.malloc.free(m);
+    final result = ptr.cast<pkg_ffi.Utf8>().toDartString();
+    _free(ptr);
+    return result;
+  }
+
+  String validateCustom(String prompt, String providersJson, String guidelinesJson) {
+    final p = prompt.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final j = providersJson.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final g = guidelinesJson.toNativeUtf8(allocator: pkg_ffi.malloc);
+    final ptr = _validateCustom(p.cast(), j.cast(), g.cast());
+    pkg_ffi.malloc.free(p); pkg_ffi.malloc.free(j); pkg_ffi.malloc.free(g);
+    final result = ptr.cast<pkg_ffi.Utf8>().toDartString();
+    _free(ptr);
+    return result;
   }
 }

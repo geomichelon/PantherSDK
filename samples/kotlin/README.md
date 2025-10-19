@@ -7,13 +7,16 @@ What this sample does
 - List Items: JSON array of metric names via `panther_storage_list_metrics`
 - Get Logs: JSON array of log lines via `panther_logs_get`
 - Validate (white‑label): fields for provider (type/base/model/key) and a button to run validation for any LLM. Under the hood, the app calls a single FFI `panther_validation_run_multi` via `PantherBridge.validateMulti`.
+- Multi‑provider with proof: calls `validateMultiWithProof` and shows `combined_hash`.
+- Token + Cost estimate: each result line appends `tokens_in/tokens_out` and `$cost` using `panther_token_count` and `panther_calculate_cost` with editable rules.
 
 0) Open Android Studio and import `samples/kotlin/android`.
 
 1) Build shared lib for Android emulator
 - Install cargo-ndk: `cargo install cargo-ndk`
 - Add target: `rustup target add x86_64-linux-android`
-- Build: `cargo ndk -t x86_64 -o app/src/main/jniLibs build -p panther-ffi --release`
+- Build FFI (enable validation + metrics/bias):
+  `cargo ndk -t x86_64 -o app/src/main/jniLibs build -p panther-ffi --release --features "validation validation-openai validation-ollama metrics-inmemory storage-inmemory"`
   This creates `app/src/main/jniLibs/x86_64/libpanther_ffi.so`.
 
 2) JNI wrapper is configured
@@ -39,5 +42,13 @@ val lines = sdk.validate("Explain insulin function")
 4) Run on Android Emulator (x86_64)
 - Ensure the emulator ABI is x86_64 and run.
 
+2) JNI wrapper is configured
+- `app/src/main/cpp/panther_jni.c` exposes validate/withProof + metrics + bias + token/cost.
+- Ensure `bindings/include/panther.h` exists (run cbindgen if missing).
+
+3) Run on Android Emulator (x86_64)
+- Ensure the emulator ABI is x86_64 and run.
+
 Notes
-- Build FFI with features: `--features "metrics storage validation validation-openai validation-ollama"`
+- Use `10.0.2.2` for backend calls from the emulator.
+- The default pricing table is embedded in `PantherSDK.kt` (`defaultCostRulesJson`).

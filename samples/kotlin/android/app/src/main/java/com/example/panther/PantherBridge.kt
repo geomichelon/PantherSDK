@@ -19,9 +19,14 @@ object PantherBridge {
     external fun validate(prompt: String): String
     external fun validateMulti(prompt: String, providersJson: String): String
     external fun validateCustom(prompt: String, providersJson: String, guidelinesJson: String): String
+    external fun validateOpenAI(prompt: String, apiKey: String, model: String, base: String): String
+    external fun validateOllama(prompt: String, base: String, model: String): String
     external fun version(): String
     external fun validateMultiWithProof(prompt: String, providersJson: String): String
     external fun validateCustomWithProof(prompt: String, providersJson: String, guidelinesJson: String): String
+    external fun biasDetect(samplesJson: String): String
+    external fun tokenCount(text: String): Int
+    external fun calculateCost(tokensIn: Int, tokensOut: Int, providerName: String, costRulesJson: String): Double
 
     // Helpers for corpus JSON and plagiarism score
     fun corpusJson(list: List<String>): String = JSONArray(list).toString()

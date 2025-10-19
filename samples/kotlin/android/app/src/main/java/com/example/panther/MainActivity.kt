@@ -21,7 +21,8 @@ class MainActivity : AppCompatActivity() {
         ProviderPreset("Groq",     "openai", "https://api.groq.com/openai/v1",          "llama3-70b-8192",          true),
         ProviderPreset("Together", "openai", "https://api.together.xyz/v1",             "meta-llama/Meta-Llama-3.1-70B-Instruct", true),
         ProviderPreset("Mistral",  "openai", "https://api.mistral.ai",                 "mistral-small-latest",     true),
-        ProviderPreset("Ollama",   "ollama", "http://127.0.0.1:11434",                 "llama3",                   false)
+        ProviderPreset("Ollama",   "ollama", "http://127.0.0.1:11434",                 "llama3",                   false),
+        ProviderPreset("Anthropic","anthropic","https://api.anthropic.com",          "claude-3-5-sonnet-latest", true)
     )
     private val openAIModels = listOf("gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-4o", "chatgpt-5")
     private val ollamaModels = listOf("llama3", "phi3", "mistral")
@@ -243,6 +244,7 @@ class MainActivity : AppCompatActivity() {
                     o.put("base_url", l.base_url)
                     o.put("model", l.model)
                     if (l.type == "openai" && !l.api_key.isNullOrBlank()) o.put("api_key", l.api_key)
+                    if (l.type == "anthropic" && !l.api_key.isNullOrBlank()) o.put("api_key", l.api_key)
                     arr.put(o)
                 }
                 arr.toString()
@@ -254,6 +256,9 @@ class MainActivity : AppCompatActivity() {
                         PantherBridge.validateOpenAI(prompt.text.toString(), apiKeyInput.text.toString().trim(), mdl, base)
                     } else if (currentPreset.type == "ollama") {
                         PantherBridge.validateOllama(prompt.text.toString(), base, mdl)
+                    } else if (currentPreset.type == "anthropic") {
+                        // Use multi with single entry
+                        PantherBridge.validateMulti(prompt.text.toString(), providersJsonStr)
                     } else {
                         PantherBridge.validate(prompt.text.toString())
                     }

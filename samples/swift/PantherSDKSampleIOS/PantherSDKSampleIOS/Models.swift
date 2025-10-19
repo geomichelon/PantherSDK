@@ -14,6 +14,7 @@ struct ValidationRow: Identifiable {
 enum CostRules {
     static let openAIModels = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-4o", "chatgpt-5"]
     static let ollamaModels = ["llama3", "phi3", "mistral"]
+    static let anthropicModels = ["claude-3-5-sonnet-latest", "claude-3-opus-latest", "claude-3-haiku-latest"]
     static let defaultJSON = """
     [
       {"match": "openai:gpt-4o-mini",   "usd_per_1k_in": 0.15, "usd_per_1k_out": 0.60},
@@ -27,4 +28,3 @@ enum CostRules {
     ]
     """
 }
-

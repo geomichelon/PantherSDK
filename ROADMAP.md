@@ -61,7 +61,7 @@ Blockchain / Verificação
 - [x] Stage 1 FFI: `panther_validation_run_multi_with_proof`, `panther_proof_compute`, `panther_proof_verify_local`
 - [x] Stage 2 base: contrato `ProofRegistry` + FFI `panther_proof_anchor_eth`/`panther_proof_check_eth`
 - [x] API Python: `/proof/anchor` e `/proof/status`
-- [ ] Samples: botão “Anchor proof” via API (UI)
+- [x] Samples: botão “Anchor proof” via API (UI)
 - [ ] Automação de deploy do contrato (testnet) e link para explorer
 
 Observabilidade/Métricas

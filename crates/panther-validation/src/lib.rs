@@ -151,6 +151,22 @@ impl ProviderFactory {
             Err(anyhow::anyhow!("ollama feature not enabled"))
         }
     }
+
+    pub fn anthropic_from_env() -> Result<(String, Arc<dyn LlmProvider>)> {
+        #[cfg(feature = "anthropic")]
+        {
+            let api_key = std::env::var("PANTHER_ANTHROPIC_API_KEY")?;
+            let model = std::env::var("PANTHER_ANTHROPIC_MODEL").unwrap_or_else(|_| "claude-3-5-sonnet-latest".to_string());
+            let base = std::env::var("PANTHER_ANTHROPIC_BASE").unwrap_or_else(|_| "https://api.anthropic.com".to_string());
+            let version = std::env::var("PANTHER_ANTHROPIC_VERSION").unwrap_or_else(|_| "2023-06-01".to_string());
+            let p = panther_providers::anthropic::AnthropicProvider { api_key, model: model.clone(), base_url: base, version };
+            Ok((format!("anthropic:{}", model), Arc::new(p)))
+        }
+        #[cfg(not(feature = "anthropic"))]
+        {
+            Err(anyhow::anyhow!("anthropic feature not enabled"))
+        }
+    }
 }
 
 pub struct ProviderFactoryAsync;
@@ -182,6 +198,22 @@ impl ProviderFactoryAsync {
         #[cfg(not(feature = "ollama-async"))]
         {
             Err(anyhow::anyhow!("ollama-async feature not enabled"))
+        }
+    }
+
+    pub fn anthropic_from_env() -> Result<(String, Arc<dyn panther_domain::ports::LlmProviderAsync>)> {
+        #[cfg(feature = "anthropic-async")]
+        {
+            let api_key = std::env::var("PANTHER_ANTHROPIC_API_KEY")?;
+            let model = std::env::var("PANTHER_ANTHROPIC_MODEL").unwrap_or_else(|_| "claude-3-5-sonnet-latest".to_string());
+            let base = std::env::var("PANTHER_ANTHROPIC_BASE").unwrap_or_else(|_| "https://api.anthropic.com".to_string());
+            let version = std::env::var("PANTHER_ANTHROPIC_VERSION").unwrap_or_else(|_| "2023-06-01".to_string());
+            let p = panther_providers::anthropic_async::AnthropicProviderAsync { api_key, model: model.clone(), base_url: base, version, timeout_secs: 30, retries: 2 };
+            Ok((format!("anthropic:{}", model), Arc::new(p)))
+        }
+        #[cfg(not(feature = "anthropic-async"))]
+        {
+            Err(anyhow::anyhow!("anthropic-async feature not enabled"))
         }
     }
 }

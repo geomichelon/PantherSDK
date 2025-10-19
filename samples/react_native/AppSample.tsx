@@ -26,10 +26,11 @@ const defaultCostRules = `[
 ]`;
 const openAIModels = ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-4o', 'chatgpt-5'];
 const ollamaModels = ['llama3', 'phi3', 'mistral'];
+const anthropicModels = ['claude-3-5-sonnet-latest', 'claude-3-opus-latest', 'claude-3-haiku-latest'];
 
 export default function AppSample() {
   type Mode = 'single' | 'multi' | 'proof';
-  type Provider = 'openai' | 'ollama' | 'default';
+  type Provider = 'openai' | 'ollama' | 'anthropic' | 'default';
   const [prompt, setPrompt] = useState('Explain insulin function');
   const [providersJson, setProvidersJson] = useState(
     JSON.stringify(
@@ -55,6 +56,9 @@ export default function AppSample() {
   const [apiKeyOpenAI, setApiKeyOpenAI] = useState<string>('');
   const [ollamaBase, setOllamaBase] = useState<string>('http://127.0.0.1:11434');
   const [ollamaModel, setOllamaModel] = useState<string>('llama3');
+  const [anthropicBase, setAnthropicBase] = useState<string>('https://api.anthropic.com');
+  const [anthropicModel, setAnthropicModel] = useState<string>('claude-3-5-sonnet-latest');
+  const [apiKeyAnthropic, setApiKeyAnthropic] = useState<string>('');
   const [apiKey, setApiKey] = useState('');
   const [lines, setLines] = useState<string[]>([]);
   const [proof, setProof] = useState<string | null>(null);
@@ -102,6 +106,9 @@ export default function AppSample() {
           raw = await validateOpenAI(prompt, apiKeyOpenAI, openAIModel, openAIBase);
         } else if (provider === 'ollama') {
           raw = await validateOllama(prompt, ollamaBase, ollamaModel);
+        } else if (provider === 'anthropic') {
+          const singleAnthropic = JSON.stringify([{ type: 'anthropic', base_url: anthropicBase, model: anthropicModel, api_key: apiKeyAnthropic }]);
+          raw = await validateMulti(prompt, singleAnthropic);
         } else {
           raw = await validate(prompt);
         }
@@ -304,6 +311,8 @@ export default function AppSample() {
         <View style={{width:8}} />
         <Button title={provider === 'ollama' ? 'Ollama' : 'ollama'} onPress={() => setProvider('ollama')} />
         <View style={{width:8}} />
+        <Button title={provider === 'anthropic' ? 'Anthropic' : 'anthropic'} onPress={() => setProvider('anthropic')} />
+        <View style={{width:8}} />
         <Button title={provider === 'default' ? 'Default' : 'default'} onPress={() => setProvider('default')} />
       </View>
 
@@ -325,6 +334,17 @@ export default function AppSample() {
           <View style={[styles.row, {flexWrap: 'wrap'}]}>
             {ollamaModels.map((m) => (
               <Button key={m} title={m} onPress={() => setOllamaModel(m)} />
+            ))}
+          </View>
+        </>
+      ) : provider === 'anthropic' ? (
+        <>
+          <TextInput style={styles.input} value={apiKeyAnthropic} onChangeText={setApiKeyAnthropic} placeholder="Anthropic API Key" secureTextEntry />
+          <TextInput style={styles.input} value={anthropicBase} onChangeText={setAnthropicBase} placeholder="Base URL (https://api.anthropic.com)" />
+          <TextInput style={styles.input} value={anthropicModel} onChangeText={setAnthropicModel} placeholder="Model (e.g., claude-3-5-sonnet-latest)" />
+          <View style={[styles.row, {flexWrap: 'wrap'}]}>
+            {anthropicModels.map((m) => (
+              <Button key={m} title={m} onPress={() => setAnthropicModel(m)} />
             ))}
           </View>
         </>

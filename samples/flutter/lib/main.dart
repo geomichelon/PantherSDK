@@ -80,7 +80,7 @@ class _MyAppState extends State<MyApp> {
   double? biasScore;
   List<dynamic> lastResults = [];
   String mode = 'proof'; // single | multi | proof
-  String provider = 'openai'; // openai | ollama | default
+  String provider = 'openai'; // openai | ollama | anthropic | default
 
   @override
   void initState() {
@@ -290,6 +290,8 @@ class _MyAppState extends State<MyApp> {
                 const SizedBox(width: 8),
                 ChoiceChip(label: const Text('Ollama'), selected: provider=='ollama', onSelected: (_){ setState(()=> provider='ollama'); }),
                 const SizedBox(width: 8),
+                ChoiceChip(label: const Text('Anthropic'), selected: provider=='anthropic', onSelected: (_){ setState(()=> provider='anthropic'); }),
+                const SizedBox(width: 8),
                 ChoiceChip(label: const Text('Default'), selected: provider=='default', onSelected: (_){ setState(()=> provider='default'); }),
               ]),
               if (provider=='openai') ...[
@@ -319,6 +321,22 @@ class _MyAppState extends State<MyApp> {
                     label: Text(m),
                     selected: ollamaModelController.text.trim()==m,
                     onSelected: (_){ setState(()=> ollamaModelController.text=m); },
+                  )).toList(),
+                ),
+              ]
+              else if (provider=='anthropic') ...[
+                TextField(controller: anthropicKeyController, decoration: const InputDecoration(labelText: 'Anthropic API Key'), obscureText: true),
+                const SizedBox(height: 8),
+                TextField(controller: anthropicBaseController, decoration: const InputDecoration(labelText: 'Base URL (https://api.anthropic.com)')),
+                const SizedBox(height: 8),
+                TextField(controller: anthropicModelController, decoration: const InputDecoration(labelText: 'Model (e.g., claude-3-5-sonnet-latest)')),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: ['claude-3-5-sonnet-latest','claude-3-opus-latest','claude-3-haiku-latest'].map((m) => ChoiceChip(
+                    label: Text(m),
+                    selected: anthropicModelController.text.trim()==m,
+                    onSelected: (_){ setState(()=> anthropicModelController.text=m); },
                   )).toList(),
                 ),
               ]

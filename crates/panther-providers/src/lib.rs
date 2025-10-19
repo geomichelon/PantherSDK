@@ -222,6 +222,123 @@ pub mod ollama {
     }
 }
 
+#[cfg(feature = "anthropic")]
+pub mod anthropic {
+    use super::*;
+
+    #[derive(Clone)]
+    pub struct AnthropicProvider {
+        pub api_key: String,
+        pub model: String,
+        pub base_url: String,
+        pub version: String, // e.g., "2023-06-01"
+    }
+
+    impl LlmProvider for AnthropicProvider {
+        fn generate(&self, prompt: &Prompt) -> anyhow::Result<Completion> {
+            let url = format!("{}/v1/messages", self.base_url.trim_end_matches('/'));
+            let body = serde_json::json!({
+                "model": self.model,
+                "max_tokens": 512,
+                "temperature": 0.2,
+                "messages": [
+                    {"role": "user", "content": [{"type":"text","text": prompt.text}]}
+                ]
+            });
+            let client = reqwest::blocking::Client::new();
+            let res = client
+                .post(url)
+                .header("x-api-key", &self.api_key)
+                .header("anthropic-version", &self.version)
+                .json(&body)
+                .send()?;
+            let status = res.status();
+            let v: serde_json::Value = res.json()?;
+            if !status.is_success() {
+                return Err(anyhow::anyhow!("anthropic error: {}", v));
+            }
+            let text = v["content"][0]["text"].as_str().unwrap_or("").to_string();
+            Ok(Completion { text, model: Some(self.model.clone()) })
+        }
+        fn name(&self) -> &'static str { "anthropic" }
+    }
+}
+
+#[cfg(feature = "anthropic-async")]
+pub mod anthropic_async {
+    use super::*;
+    use async_trait::async_trait;
+    use reqwest::StatusCode;
+
+    #[derive(Clone)]
+    pub struct AnthropicProviderAsync {
+        pub api_key: String,
+        pub model: String,
+        pub base_url: String,
+        pub version: String, // e.g., "2023-06-01"
+        pub timeout_secs: u64,
+        pub retries: u32,
+    }
+
+    #[async_trait]
+    impl LlmProviderAsync for AnthropicProviderAsync {
+        async fn generate(&self, prompt: &Prompt) -> anyhow::Result<Completion> {
+            let url = format!("{}/v1/messages", self.base_url.trim_end_matches('/'));
+            let body = serde_json::json!({
+                "model": self.model,
+                "max_tokens": 512,
+                "temperature": 0.2,
+                "messages": [
+                    {"role": "user", "content": [{"type":"text","text": prompt.text}]}
+                ]
+            });
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(self.timeout_secs.max(1)))
+                .build()?;
+            let mut last_err: Option<anyhow::Error> = None;
+            let mut delay_ms: u64 = 200;
+            for attempt in 0..=self.retries {
+                let res = client
+                    .post(&url)
+                    .header("x-api-key", &self.api_key)
+                    .header("anthropic-version", &self.version)
+                    .json(&body)
+                    .send()
+                    .await;
+                match res {
+                    Ok(resp) => {
+                        let status = resp.status();
+                        let v: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!({"error":"invalid json"}));
+                        if status.is_success() {
+                            let text = v["content"][0]["text"].as_str().unwrap_or("").to_string();
+                            return Ok(Completion { text, model: Some(self.model.clone()) });
+                        }
+                        let category = match status {
+                            StatusCode::TOO_MANY_REQUESTS => "rate_limit",
+                            StatusCode::BAD_REQUEST | StatusCode::UNPROCESSABLE_ENTITY => "invalid_request",
+                            _ if status.is_server_error() => "upstream_error",
+                            _ => "request_error",
+                        };
+                        last_err = Some(anyhow::anyhow!("{}: anthropic [{}]: {}", category, status, v));
+                    }
+                    Err(e) => {
+                        let category = if e.is_timeout() { "timeout" } else { "network_error" };
+                        last_err = Some(anyhow::anyhow!("{}: anthropic request failed: {}", category, e));
+                    }
+                }
+                if attempt < self.retries {
+                    let jitter = ((attempt as u64 * 43) % 120) as u64;
+                    let wait = (delay_ms + jitter).min(2000);
+                    tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
+                    delay_ms = delay_ms.saturating_mul(2);
+                }
+            }
+            Err(last_err.unwrap_or_else(|| anyhow::anyhow!("anthropic unknown error")))
+        }
+        fn name(&self) -> &'static str { "anthropic" }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

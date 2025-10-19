@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     enum Mode: String, CaseIterable { case single = "Single", multi = "Multi", proof = "With Proof" }
-    enum Provider: String, CaseIterable { case openai = "OpenAI", ollama = "Ollama", `default` = "Default" }
+    enum Provider: String, CaseIterable { case openai = "OpenAI", ollama = "Ollama", anthropic = "Anthropic", `default` = "Default" }
 
     @State private var prompt: String = "Explique recomendações seguras de medicamentos na gravidez."
     @State private var mode: Mode = .single
@@ -14,6 +14,10 @@ struct ContentView: View {
 
     @State private var ollamaBase: String = "http://127.0.0.1:11434"
     @State private var ollamaModel: String = "llama3"
+
+    @State private var anthropicBase: String = "https://api.anthropic.com"
+    @State private var anthropicModel: String = "claude-3-5-sonnet-latest"
+    @State private var anthropicKey: String = ""
 
     @State private var useCustomGuidelines: Bool = false
     @State private var customGuidelines: String = ""
@@ -66,6 +70,14 @@ struct ContentView: View {
                             TextField("Ollama Base (http://127.0.0.1:11434)", text: $ollamaBase)
                                 .textFieldStyle(.roundedBorder)
                             ModelPicker(title: "Model", presets: CostRules.ollamaModels, selection: $ollamaModel)
+                        } else if provider == .anthropic {
+                            TextField("Anthropic API Key", text: $anthropicKey)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("Base URL (https://api.anthropic.com)", text: $anthropicBase)
+                                .textFieldStyle(.roundedBorder)
+                            ModelPicker(title: "Model", presets: CostRules.anthropicModels, selection: $anthropicModel)
                         } else {
                             Text("Usando providers de ambiente (Default)")
                                 .font(.caption)
@@ -195,6 +207,12 @@ struct ContentView: View {
                 switch provider {
                 case .openai: output = callOpenAI(prompt: prompt, apiKey: apiKey, model: openAIModel, base: openAIBase)
                 case .ollama: output = callOllama(prompt: prompt, base: ollamaBase, model: ollamaModel)
+                case .anthropic:
+                    // Use multi path with single entry
+                    let arr: [[String: String]] = [["type": "anthropic", "api_key": anthropicKey, "model": anthropicModel, "base_url": anthropicBase]]
+                    let data = try? JSONSerialization.data(withJSONObject: arr)
+                    let singleJSON = String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
+                    output = callMulti(prompt: prompt, providersJSON: singleJSON, withProof: false)
                 case .default: output = callDefault(prompt: prompt)
                 }
             case .multi:
@@ -216,6 +234,8 @@ struct ContentView: View {
             arr.append(["type": "openai", "api_key": apiKey, "model": openAIModel, "base_url": openAIBase])
         case .ollama:
             arr.append(["type": "ollama", "model": ollamaModel, "base_url": ollamaBase])
+        case .anthropic:
+            arr.append(["type": "anthropic", "api_key": anthropicKey, "model": anthropicModel, "base_url": anthropicBase])
         case .default:
             break
         }

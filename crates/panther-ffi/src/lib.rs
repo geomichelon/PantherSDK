@@ -485,6 +485,21 @@ pub extern "C" fn panther_validation_run_custom_with_proof(
                         providers_async.push((format!("ollama:{}", model), Arc::new(p)));
                     }
                 }
+                #[cfg(feature = "validation-anthropic-async")]
+                "anthropic" => {
+                    if let (Some(key), Some(model)) = (c.api_key.clone(), c.model.clone()) {
+                        let base = c.base_url.clone().unwrap_or_else(|| "https://api.anthropic.com".to_string());
+                        let p = panther_providers::anthropic_async::AnthropicProviderAsync {
+                            api_key: key,
+                            model: model.clone(),
+                            base_url: base,
+                            version: "2023-06-01".to_string(),
+                            timeout_secs: 30,
+                            retries: 2,
+                        };
+                        providers_async.push((format!("anthropic:{}", model), Arc::new(p)));
+                    }
+                }
                 _ => {}
             }
         }
@@ -534,6 +549,14 @@ pub extern "C" fn panther_validation_run_custom_with_proof(
                 if let (Some(base), Some(model)) = (c.base_url.clone(), c.model.clone()) {
                     let p = panther_providers::ollama::OllamaProvider { base_url: base, model: model.clone() };
                     providers.push((format!("ollama:{}", model), Arc::new(p)));
+                }
+            }
+            #[cfg(feature = "validation-anthropic")]
+            "anthropic" => {
+                if let (Some(key), Some(model)) = (c.api_key.clone(), c.model.clone()) {
+                    let base = c.base_url.unwrap_or_else(|| "https://api.anthropic.com".to_string());
+                    let p = panther_providers::anthropic::AnthropicProvider { api_key: key, model: model.clone(), base_url: base, version: "2023-06-01".to_string() };
+                    providers.push((format!("anthropic:{}", model), Arc::new(p)));
                 }
             }
             _ => {}
@@ -685,6 +708,14 @@ pub extern "C" fn panther_validation_run_multi_with_proof(
                 if let (Some(base), Some(model)) = (c.base_url.clone(), c.model.clone()) {
                     let p = panther_providers::ollama::OllamaProvider { base_url: base, model: model.clone() };
                     providers.push((format!("ollama:{}", model), Arc::new(p)));
+                }
+            }
+            #[cfg(feature = "validation-anthropic")]
+            "anthropic" => {
+                if let (Some(key), Some(model)) = (c.api_key.clone(), c.model.clone()) {
+                    let base = c.base_url.unwrap_or_else(|| "https://api.anthropic.com".to_string());
+                    let p = panther_providers::anthropic::AnthropicProvider { api_key: key, model: model.clone(), base_url: base, version: "2023-06-01".to_string() };
+                    providers.push((format!("anthropic:{}", model), Arc::new(p)));
                 }
             }
             _ => {}
@@ -988,6 +1019,23 @@ pub extern "C" fn panther_validation_run_custom(
                             model: model.to_string(),
                         };
                         providers.push((format!("ollama:{}", model), Arc::new(prov)));
+                    }
+                }
+                #[cfg(feature = "validation-anthropic")]
+                "anthropic" => {
+                    if let (Some(base), Some(model)) = (
+                        entry.get("base_url").and_then(|v| v.as_str()),
+                        entry.get("model").and_then(|v| v.as_str()),
+                    ) {
+                        if let Some(api_key) = entry.get("api_key").and_then(|v| v.as_str()) {
+                            let prov = panther_providers::anthropic::AnthropicProvider {
+                                api_key: api_key.to_string(),
+                                model: model.to_string(),
+                                base_url: base.to_string(),
+                                version: "2023-06-01".to_string(),
+                            };
+                            providers.push((format!("anthropic:{}", model), Arc::new(prov)));
+                        }
                     }
                 }
                 _ => {}

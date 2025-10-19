@@ -4,7 +4,16 @@ Coloque aqui a PantherSDKIOS.xcframework (renomeada) gerada pelo script de relea
 
 1) Build a XCFramework:
 
+   # OpenAI + Ollama (baseline)
    FEATURES="metrics-inmemory storage-inmemory validation validation-openai validation-ollama" \
+   ./scripts/release/build_ios_xcframework.sh
+
+   # Include Anthropic (sync)
+   FEATURES="metrics-inmemory storage-inmemory validation validation-openai validation-ollama validation-anthropic" \
+   ./scripts/release/build_ios_xcframework.sh
+
+   # Include Anthropic (async) — enables async validation path
+   FEATURES="metrics-inmemory storage-inmemory validation validation-async validation-openai validation-ollama validation-anthropic validation-anthropic-async" \
    ./scripts/release/build_ios_xcframework.sh
 
 2) Copie o bundle gerado para esta pasta:

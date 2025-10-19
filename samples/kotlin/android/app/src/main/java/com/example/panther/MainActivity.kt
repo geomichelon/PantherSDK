@@ -23,6 +23,8 @@ class MainActivity : AppCompatActivity() {
         ProviderPreset("Mistral",  "openai", "https://api.mistral.ai",                 "mistral-small-latest",     true),
         ProviderPreset("Ollama",   "ollama", "http://127.0.0.1:11434",                 "llama3",                   false)
     )
+    private val openAIModels = listOf("gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-4o", "chatgpt-5")
+    private val ollamaModels = listOf("llama3", "phi3", "mistral")
 
     private val prefs by lazy { getSharedPreferences("panther-sdk", MODE_PRIVATE) }
     private var lastProof: String? = null
@@ -47,6 +49,18 @@ class MainActivity : AppCompatActivity() {
         val apiKeyInput = EditText(this).apply { hint = "API Key" }
         apiKeyInput.inputType = InputType.TYPE_TEXT_VARIATION_PASSWORD
 
+        // Model preset rows (toggle visibility by provider type)
+        val modelPresetRowOpenAI = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
+        openAIModels.forEach { m ->
+            val b = Button(this).apply { text = m; setOnClickListener { modelInput.setText(m) } }
+            modelPresetRowOpenAI.addView(b)
+        }
+        val modelPresetRowOllama = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
+        ollamaModels.forEach { m ->
+            val b = Button(this).apply { text = m; setOnClickListener { modelInput.setText(m) } }
+            modelPresetRowOllama.addView(b)
+        }
+
         val includeOllamaCheck = CheckBox(this).apply { text = "Include local Ollama" }
         val ollamaBaseInput = EditText(this).apply { hint = "Ollama Base" }
         val ollamaModelInput = EditText(this).apply { hint = "Ollama Model" }
@@ -61,7 +75,21 @@ class MainActivity : AppCompatActivity() {
         val guidelineStatus = TextView(this)
         val btnSaveGuidelines = Button(this).apply { text = "Save Guidelines" }
 
+        // Cost rules editor
+        val costRulesTitle = TextView(this).apply { text = "Cost Rules (JSON)"; textSize = 16f }
+        val costRulesInput = EditText(this).apply {
+            hint = "Cost rules as JSON array"
+            setLines(6); isSingleLine = false
+            setText(prefs.getString("cost.rules", PantherSDK.defaultCostRulesJson) ?: PantherSDK.defaultCostRulesJson)
+        }
+        val btnRestoreCost = Button(this).apply { text = "Restore Default" }
+        val btnSaveCost = Button(this).apply { text = "Save Cost Rules" }
+
         val btnValidate = Button(this).apply { text = "Validate" }
+        // Mode selector: Single / Multi / With Proof
+        val modeSpinner = Spinner(this)
+        val modes = listOf("Single", "Multi", "With Proof")
+        modeSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, modes)
         // Backend API config
         val backendBaseInput = EditText(this).apply { hint = "API Base (e.g. http://10.0.2.2:8000)" }
         val backendKeyInput = EditText(this).apply { hint = "API Key (X-API-Key, optional)" }
@@ -79,6 +107,12 @@ class MainActivity : AppCompatActivity() {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 currentPreset = presets[position]
                 applyPreset(currentPreset, baseInput, modelInput, apiKeyInput)
+                // Toggle model preset rows
+                when (currentPreset.type) {
+                    "openai" -> { modelPresetRowOpenAI.visibility = View.VISIBLE; modelPresetRowOllama.visibility = View.GONE }
+                    "ollama" -> { modelPresetRowOpenAI.visibility = View.GONE; modelPresetRowOllama.visibility = View.VISIBLE }
+                    else -> { modelPresetRowOpenAI.visibility = View.GONE; modelPresetRowOllama.visibility = View.GONE }
+                }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -110,6 +144,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        btnRestoreCost.setOnClickListener {
+            costRulesInput.setText(PantherSDK.defaultCostRulesJson)
+        }
+        btnSaveCost.setOnClickListener {
+            prefs.edit().putString("cost.rules", costRulesInput.text.toString()).apply()
+            Toast.makeText(this, "Cost rules saved", Toast.LENGTH_SHORT).show()
+        }
+
         content.apply {
             addView(btnRecord)
             addView(btnList)
@@ -118,7 +160,11 @@ class MainActivity : AppCompatActivity() {
             addView(spinner)
             addView(baseInput)
             addView(modelInput)
+            addView(modelPresetRowOpenAI)
+            addView(modelPresetRowOllama)
             addView(apiKeyInput)
+            addView(TextView(this@MainActivity).apply { text = "Mode" })
+            addView(modeSpinner)
             addView(includeOllamaCheck)
             addView(ollamaBaseInput)
             addView(ollamaModelInput)
@@ -126,6 +172,16 @@ class MainActivity : AppCompatActivity() {
             addView(guidelineInput)
             addView(btnSaveGuidelines)
             addView(guidelineStatus)
+            // Cost rules (JSON) editor
+            addView(costRulesTitle)
+            addView(costRulesInput)
+            val costRow = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL }
+            costRow.addView(btnRestoreCost)
+            val spacer = Space(this@MainActivity)
+            spacer.minimumWidth = 24
+            costRow.addView(spacer)
+            costRow.addView(btnSaveCost)
+            addView(costRow)
             addView(TextView(this@MainActivity).apply { text = "Backend API" })
             addView(backendBaseInput)
             addView(backendKeyInput)
@@ -154,7 +210,8 @@ class MainActivity : AppCompatActivity() {
                 outputView.text = "API key required for ${currentPreset.label}"
                 return@setOnClickListener
             }
-            llms.add(
+            val providers = mutableListOf<PantherSDK.LLM>()
+            providers.add(
                 PantherSDK.LLM(
                     type = currentPreset.type,
                     base_url = base,
@@ -163,7 +220,7 @@ class MainActivity : AppCompatActivity() {
                 )
             )
             if (includeOllamaCheck.isChecked) {
-                llms.add(
+                providers.add(
                     PantherSDK.LLM(
                         type = "ollama",
                         base_url = ollamaBaseInput.text.toString().trim(),
@@ -172,9 +229,54 @@ class MainActivity : AppCompatActivity() {
                     )
                 )
             }
-            val sdk = PantherSDK.make(llms)
-            val guidelines = if (guidelineToggle.isChecked) guidelineInput.text.toString() else null
-            val (lines, proof) = sdk.validateAndGetProof(prompt.text.toString(), guidelines)
+
+            val mode = modes[modeSpinner.selectedItemPosition]
+            val useCustom = guidelineToggle.isChecked
+            val guidelines = if (useCustom) guidelineInput.text.toString() else null
+            PantherSDK.setCostRulesJson(costRulesInput.text.toString())
+
+            val providersJsonStr = run {
+                val arr = org.json.JSONArray()
+                providers.forEach { l ->
+                    val o = org.json.JSONObject()
+                    o.put("type", l.type)
+                    o.put("base_url", l.base_url)
+                    o.put("model", l.model)
+                    if (l.type == "openai" && !l.api_key.isNullOrBlank()) o.put("api_key", l.api_key)
+                    arr.put(o)
+                }
+                arr.toString()
+            }
+
+            val resultText: String = when (mode) {
+                "Single" -> {
+                    if (currentPreset.type == "openai") {
+                        PantherBridge.validateOpenAI(prompt.text.toString(), apiKeyInput.text.toString().trim(), mdl, base)
+                    } else if (currentPreset.type == "ollama") {
+                        PantherBridge.validateOllama(prompt.text.toString(), base, mdl)
+                    } else {
+                        PantherBridge.validate(prompt.text.toString())
+                    }
+                }
+                "Multi" -> {
+                    if (useCustom && !guidelines.isNullOrBlank())
+                        PantherBridge.validateCustom(prompt.text.toString(), providersJsonStr, guidelines)
+                    else
+                        PantherBridge.validateMulti(prompt.text.toString(), providersJsonStr)
+                }
+                else -> { // With Proof
+                    if (useCustom && !guidelines.isNullOrBlank())
+                        PantherBridge.validateCustomWithProof(prompt.text.toString(), providersJsonStr, guidelines)
+                    else
+                        PantherBridge.validateMultiWithProof(prompt.text.toString(), providersJsonStr)
+                }
+            }
+
+            val sdk = PantherSDK.make(providers)
+            val (lines, proof) = try {
+                // Reuse existing parser/formatter for lines + cost
+                sdk.validateAndGetProof(prompt.text.toString(), guidelines)
+            } catch (_: Throwable) { listOf(resultText) to null }
             val buf = StringBuilder()
             buf.append(lines.joinToString("\n"))
             if (proof != null) {

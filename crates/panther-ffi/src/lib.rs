@@ -278,6 +278,86 @@ pub extern "C" fn panther_version_string() -> *mut std::os::raw::c_char {
     rust_string_to_c(env!("CARGO_PKG_VERSION").to_string())
 }
 
+// ---------- Token/Cost FFI ----------
+#[no_mangle]
+pub extern "C" fn panther_token_count(text: *const c_char) -> i32 {
+    if text.is_null() { return 0; }
+    let t = unsafe { CStr::from_ptr(text).to_string_lossy().into_owned() };
+    // Simple whitespace tokenizer heuristic (kept consistent with panther-core)
+    t.split_whitespace().count() as i32
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct CostRuleCompat {
+    // Accept both keys: `match` (used by samples) and `provider` (used by tools)
+    #[serde(default)]
+    r#match: Option<String>,
+    #[serde(default)]
+    provider: Option<String>,
+    #[serde(default)]
+    usd_per_1k_in: Option<f64>,
+    #[serde(default)]
+    usd_per_1k_out: Option<f64>,
+}
+
+fn select_rule<'a>(prov: &str, rules: &'a [CostRuleCompat]) -> Option<&'a CostRuleCompat> {
+    // Prefer the longest matching prefix; support exact, prefix with trailing ':', and wildcard '*'
+    let mut best: Option<&CostRuleCompat> = None;
+    let mut best_len: usize = 0;
+    for r in rules {
+        let key = r.r#match.as_ref().or(r.provider.as_ref());
+        if let Some(k) = key {
+            if k == prov {
+                return Some(r);
+            }
+            if k == "*" {
+                if best.is_none() { best = Some(r); best_len = 1; }
+                continue;
+            }
+            if k.ends_with(':') && prov.starts_with(k) {
+                let len = k.len();
+                if len > best_len { best = Some(r); best_len = len; }
+            }
+        }
+    }
+    best
+}
+
+#[no_mangle]
+pub extern "C" fn panther_calculate_cost(
+    tokens_in: i32,
+    tokens_out: i32,
+    provider_name: *const c_char,
+    cost_rules_json: *const c_char,
+) -> f64 {
+    if provider_name.is_null() || cost_rules_json.is_null() { return 0.0; }
+    let prov = unsafe { CStr::from_ptr(provider_name).to_string_lossy().into_owned() };
+    let rules_s = unsafe { CStr::from_ptr(cost_rules_json).to_string_lossy().into_owned() };
+    let mut rules_vec: Vec<CostRuleCompat> = Vec::new();
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&rules_s) {
+        if let Some(arr) = v.as_array() {
+            rules_vec = arr.iter().filter_map(|x| serde_json::from_value::<CostRuleCompat>(x.clone()).ok()).collect();
+        } else if let Some(arr) = v.get("rules").and_then(|x| x.as_array()) {
+            rules_vec = arr.iter().filter_map(|x| serde_json::from_value::<CostRuleCompat>(x.clone()).ok()).collect();
+        }
+    }
+    if let Some(rule) = select_rule(&prov, &rules_vec) {
+        let cin = rule.usd_per_1k_in.unwrap_or(0.0);
+        let cout = rule.usd_per_1k_out.unwrap_or(0.0);
+        let ti = (tokens_in.max(0) as f64) / 1000.0;
+        let to = (tokens_out.max(0) as f64) / 1000.0;
+        return ti * cin + to * cout;
+    }
+    0.0
+}
+
+#[no_mangle]
+pub extern "C" fn panther_get_token_metrics() -> *mut std::os::raw::c_char {
+    // Minimal stub: return an empty object to satisfy linkage for samples that might call this.
+    // Token histories can be retrieved via storage APIs if enabled.
+    rust_string_to_c("{}".to_string())
+}
+
 // ---------- Agents (optional Stage 6) ----------
 #[cfg(feature = "agents")]
 #[no_mangle]

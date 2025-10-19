@@ -17,6 +17,8 @@ openai = ["dep:reqwest"]
 ollama = ["dep:reqwest"]
 openai-async = ["dep:reqwest"]
 ollama-async = ["dep:reqwest"]
+anthropic = ["dep:reqwest"]
+anthropic-async = ["dep:reqwest"]
 
 [dependencies.reqwest]
 version = "0.12"

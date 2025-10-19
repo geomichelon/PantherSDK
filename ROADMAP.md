@@ -12,7 +12,7 @@ Visão Rápida
 - [x] Samples: Swift, Kotlin, Flutter, React Native
 - [x] Versão em FFI (`panther_version_string` dinâmico)
 - [x] Providers assíncronos (OpenAI/Ollama — básicos com timeouts/retries)
-- [ ] Anthropic (assíncrono)
+- [x] Anthropic (sync/assíncrono)
 - [ ] Exportador Prometheus (Rust) e agregações p50/p95 consolidadas
 - [x] p50/p95 no CLI de validação
 - [ ] SQL analytics (SQLite/Postgres)
@@ -80,9 +80,9 @@ Developer Experience
 
 Samples
 - [x] iOS (Swift): métricas/logs/validação, presets de providers, cache de guidelines
-- [x] Android (Kotlin/JNI): métricas/logs/validação, presets, cache de guidelines
-- [x] Flutter (Dart FFI): métricas/validação
-- [x] React Native (TurboModule/JSI): métricas/logs/validação
+- [x] Android (Kotlin/JNI): métricas/logs/validação, presets, cache de guidelines (inclui preset Anthropic)
+- [x] Flutter (Dart FFI): métricas/validação (inclui preset Anthropic)
+- [x] React Native (TurboModule/JSI): métricas/logs/validação (inclui preset Anthropic)
 - [ ] Relatórios de compliance nas demos
 - [ ] Fluxos de bias e trust em todos os samples
 
@@ -102,7 +102,7 @@ panther-providers
 - [x] `NullProvider`
 - [x] OpenAI/Ollama (reqwest blocking)
 - [x] `reqwest` async + timeouts/retries (OpenAI/Ollama)
-- [ ] Anthropic (sync/async)
+- [x] Anthropic (sync/async)
 
 panther-observability
 - [x] `init_logging` e `LogSink`

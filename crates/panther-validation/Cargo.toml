@@ -21,6 +21,8 @@ openai = ["panther-providers/openai"]
 ollama = ["panther-providers/ollama"]
 openai-async = ["panther-providers/openai-async"]
 ollama-async = ["panther-providers/ollama-async"]
+anthropic = ["panther-providers/anthropic"]
+anthropic-async = ["panther-providers/anthropic-async"]
 blockchain-eth = ["dep:ethers"]
 
 [[example]]

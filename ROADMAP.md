@@ -52,8 +52,8 @@ Python API
 Compliance/Guidelines
 - [x] `LLMValidator` (paraleliza, mede latência, ranqueia score)
 - [x] Guidelines ANVISA de exemplo
-- [ ] Ingestão de guidelines (Drive/S3)
-- [ ] Busca vetorial + similaridade
+- [x] Ingestão de guidelines via FFI (http/s3/gs) e índice em memória
+- [x] Similaridade local (BOW/Jaccard/Hybrid) e embeddings (OpenAI/Ollama) via FFI
 - [ ] `trust_index` e `bias_score` avançados
 
 Blockchain / Verificação
@@ -79,10 +79,10 @@ Developer Experience
 - [ ] CI/CD de artefatos
 
 Samples
-- [x] iOS (Swift): métricas/logs/validação, presets de providers, cache de guidelines
-- [x] Android (Kotlin/JNI): métricas/logs/validação, presets, cache de guidelines (inclui preset Anthropic)
-- [x] Flutter (Dart FFI): métricas/validação (inclui preset Anthropic)
-- [x] React Native (TurboModule/JSI): métricas/logs/validação (inclui preset Anthropic)
+ - [x] iOS (Swift): métricas/logs/validação, presets, “Fetch + scores” (Guidelines Similarity), salvar/carregar índice
+ - [x] Android (Kotlin/JNI): métricas/logs/validação, presets, “Guidelines Scores (Hybrid)” + persistência de índice
+ - [x] Flutter (Dart FFI): métricas/validação, “Fetch + scores” + persistência de índice
+ - [x] React Native (TurboModule/JSI): métricas/logs/validação, “Fetch + scores” + persistência de índice
 - [ ] Relatórios de compliance nas demos
 - [ ] Fluxos de bias e trust em todos os samples
 
@@ -122,11 +122,12 @@ panther-ffi
 - [x] Validação: default/openai/ollama/multi/custom (feature‑gated)
 - [x] Helpers métricas/armazenamento/logs
 - [ ] Suite de testes FFI
+ - [x] Guidelines Similarity FFI: `guidelines_ingest_json`, `guidelines_similarity`, `guidelines_save_json`, `guidelines_load`, `guidelines_embeddings_build`
 
 panther-validation
 - [x] `LLMValidator`, `ProviderFactory`
 - [x] Exemplo `anvisa.json`
-- [ ] Similaridade vetorial
+- [x] Similaridade baseline via BOW/Jaccard/Hybrid (via FFI)
 
 panther-cli
 - [x] Comando `validate` com saida tabular
@@ -154,11 +155,12 @@ panthersdk (aggregator)
 - [x] Re‑exports e domínios utilitários: `metrics`, `storage`, `bias`, `runtime`
 
 Milestones Próximos
-- Providers assíncronos + timeouts/retries (OpenAI/Ollama)
-- Prometheus exporter + p50/p95
-- SQL storage (SQLite) para histórico/analytics
+- Providers assíncronos + timeouts/retries (OpenAI/Ollama) — ampliar uso nos fluxos de validação/embeddings
+- Prometheus exporter + p50/p95 (Rust) e dashboards padrão
+- SQL storage (SQLite) para histórico/analytics e export de relatórios (PDF/CSV)
+- ANN opcional para embeddings (HNSW/IVF) + cache de índices
 - Suíte de testes cross‑FFI (Swift/Kotlin/Flutter/RN)
-- Empacotamento unificado + CI/CD de artefatos
+- Empacotamento unificado (xcframework/aar/wheel/npm) + CI/CD de artefatos
 
 Como Atualizar
 - Atualize status nas seções acima ao concluir entregas.

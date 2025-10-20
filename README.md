@@ -8,6 +8,17 @@ Goals
 - Automatic bindings across platforms via stable FFI or generators (PyO3 for Python, wasm-bindgen for JS, UniFFI optional for Swift/Kotlin)
 - Auditing, metrics, and enterprise integrations
 
+FAQ
+- Consulte docs/FAQ.md para respostas rápidas sobre cada feature (validação, proof, guidelines similarity, embeddings, storage/logs, custos, métricas, iOS build, etc.).
+
+What’s Included (PoC summary)
+- Multi‑provider validation (OpenAI/Ollama/Anthropic via features), ranking by adherence, latency tracking, token/cost estimation
+- Proof generation/verification and optional anchoring on Ethereum (API helper)
+- Guidelines Similarity (FFI): ingest JSON (http/s3/gs) and compute similarity by BOW/Jaccard/Hybrid; optional embeddings (OpenAI/Ollama) with cosine
+- Storage helpers (in‑memory/sled) and log capture for audit trails
+- Bias and content metrics (BLEU, ROUGE‑L, accuracy, fluency, diversity, plagiarism)
+- Samples for iOS (Swift), Android (Kotlin), Flutter (Dart FFI) e React Native (Android/iOS)
+
 Repository Structure
 - `Cargo.toml` (Rust workspace)
 - `crates/`
@@ -22,6 +33,17 @@ Repository Structure
 - `crates/panther-py` — PyO3 extension module for Python (built via maturin)
 - `bindings/` — instructions and header/wrapper generation
 - `docs/` — architecture, decisions, and guides
+
+Key FFI Exports (C ABI)
+- Core: `panther_init`, `panther_generate`, `panther_version_string`, `panther_free_string`
+- Validation: `panther_validation_run_default|openai|ollama|multi|custom`, plus `*_with_proof`
+- Proof: `panther_proof_compute`, `panther_proof_verify_local`, `panther_proof_anchor_eth`, `panther_proof_check_eth`
+- Metrics/Storage/Logs: `panther_metrics_*`, `panther_storage_*`, `panther_logs_*`, `panther_token_count`, `panther_calculate_cost`
+- Guidelines Similarity:
+  - `panther_guidelines_ingest_json(guidelines_json)` — indexa diretrizes (array de objetos `{topic, expected_terms[]}` ou `string[]`)
+  - `panther_guidelines_similarity(query, top_k, method)` — `method`: `bow|jaccard|hybrid|embed-openai|embed-ollama`
+  - `panther_guidelines_save_json(name, json)` / `panther_guidelines_load(name)` — persistência simples (via storage*)
+  - `panther_guidelines_embeddings_build(method)` — pré‑cálculo vetorial (OpenAI/Ollama)
 
 Bindings Path
 - Stable C ABI (via `panther-ffi`) + `cbindgen` to generate `panther.h`
@@ -205,10 +227,10 @@ White‑Label Validation
     `[{"type":"openai","api_key":"sk-...","base_url":"https://api.openai.com","model":"gpt-4o-mini"},{"type":"ollama","base_url":"http://127.0.0.1:11434","model":"llama3"}]`
 
 Samples (quick tour)
-- iOS (Swift): `PantherSDK.make(llms:)` then `validate(prompt:)`; the UI lets you input URL/key/model for any provider.
+- iOS (Swift): validação e “Fetch + scores” (Guidelines Similarity). Suporte a salvar/carregar índice; método `Hybrid` local e `Embed(OpenAI/Ollama)` opcional.
 - Android (Kotlin): `PantherSDK.make(listOf(LLM(...)))` then `validate(prompt)`; fields in the sample build providers JSON. Includes UI to configure Backend API and “Anchor Proof (API)”.
-- Flutter: builds providers JSON and calls `validateMultiWithProof(prompt, providersJson)` via Dart FFI. Includes “Anchor Proof (API)”.
-- React Native: native module exposes `validateMultiWithProof(...)` and helper `anchorProof(...)`. Example screen: `samples/react_native/AppSample.tsx`.
+- Flutter: validação e “Fetch + scores” (Guidelines Similarity) com FFI direto.
+- React Native: validação, “Fetch + scores” e persistência de índice; módulo nativo expõe funções guidelines*.
 
 Features and Adapters
 - Core remains independent of adapters; it depends only on domain ports.
@@ -216,6 +238,26 @@ Features and Adapters
   - `panther-ffi --features metrics-inmemory` to include in-memory metrics
   - `panther-ffi --features storage-inmemory` to include in-memory storage
   - `panther-ffi --features storage-sled` to include sled-backed storage
+  - `panther-ffi --features guidelines-embed-openai` para embeddings via OpenAI
+  - `panther-ffi --features guidelines-embed-ollama` para embeddings via Ollama
+
+Embeddings (Env vars)
+- OpenAI: `PANTHER_OPENAI_API_KEY` (obrigatória), `PANTHER_OPENAI_BASE` (padrão `https://api.openai.com`), `PANTHER_OPENAI_EMBED_MODEL` (padrão `text-embedding-3-small`)
+- Ollama: `PANTHER_OLLAMA_BASE` (padrão `http://127.0.0.1:11434`), `PANTHER_OLLAMA_EMBED_MODEL` (padrão `nomic-embed-text`)
+
+iOS XCFramework (refresh)
+- Atualize a XCFramework com as features desejadas:
+```
+FEATURES="metrics-inmemory storage-inmemory validation validation-openai validation-ollama guidelines-embed-openai guidelines-embed-ollama" \
+  ./scripts/ios_refresh_framework.sh
+```
+- Saída:
+  - `dist/<version>/ios/PantherSDK.xcframework` (build bruto)
+  - `samples/swift/frameworkIOS/PantherSDKIOS.xcframework` (copiado para o sample)
+- Verificação de symbols (opcional):
+```
+nm -gU samples/swift/frameworkIOS/PantherSDKIOS.xcframework/ios-arm64-simulator/libpanther_ffi.a | rg panther_guidelines
+```
 
 Build Tools
 - Rust: `cargo`

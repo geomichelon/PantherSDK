@@ -28,6 +28,13 @@ object PantherBridge {
     external fun tokenCount(text: String): Int
     external fun calculateCost(tokensIn: Int, tokensOut: Int, providerName: String, costRulesJson: String): Double
 
+    // Guidelines similarity (FFI)
+    external fun guidelinesIngest(json: String): Int
+    external fun guidelinesScores(query: String, topK: Int, method: String): String
+    external fun guidelinesSave(name: String, json: String): Int
+    external fun guidelinesLoad(name: String): Int
+    external fun guidelinesBuildEmbeddings(method: String): Int
+
     // Helpers for corpus JSON and plagiarism score
     fun corpusJson(list: List<String>): String = JSONArray(list).toString()
     fun plagiarismScore(corpus: List<String>, candidate: String, ngram: Int = 3): Double {

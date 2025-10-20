@@ -33,6 +33,12 @@ public class PantherModule extends ReactContextBaseJavaModule {
     private static native String validateCustom(String prompt, String providersJson, String guidelinesJson);
     private static native int tokenCount(String text);
     private static native double calculateCost(int tokensIn, int tokensOut, String providerName, String costRulesJson);
+    // Guidelines
+    private static native int pantherGuidelinesIngest(String json);
+    private static native String pantherGuidelinesScores(String query, int topK, String method);
+    private static native int pantherGuidelinesSave(String name, String json);
+    private static native int pantherGuidelinesLoad(String name);
+    private static native int pantherGuidelinesEmbeddingsBuild(String method);
 
     @ReactMethod
     public void init(Promise promise) {
@@ -115,4 +121,23 @@ public class PantherModule extends ReactContextBaseJavaModule {
     public void calculateCost(int tokensIn, int tokensOut, String providerName, String costRulesJson, Promise promise) {
         promise.resolve(calculateCost(tokensIn, tokensOut, providerName, costRulesJson));
     }
+
+    // --- Guidelines ---
+    @ReactMethod
+    public void guidelinesIngest(String json, Promise promise) { promise.resolve(pantherGuidelinesIngest(json)); }
+
+    @ReactMethod
+    public void guidelinesScores(String query, int topK, String method, Promise promise) { promise.resolve(pantherGuidelinesScores(query, topK, method)); }
+
+    @ReactMethod
+    public void guidelinesSave(String name, String json, Promise promise) {
+        int rc = pantherGuidelinesSave(name, json);
+        if (rc == 0) promise.resolve(rc); else promise.reject("ERR_GUIDE_SAVE", "save failed");
+    }
+
+    @ReactMethod
+    public void guidelinesLoad(String name, Promise promise) { promise.resolve(pantherGuidelinesLoad(name)); }
+
+    @ReactMethod
+    public void guidelinesBuildEmbeddings(String method, Promise promise) { promise.resolve(pantherGuidelinesEmbeddingsBuild(method)); }
 }

@@ -18,6 +18,12 @@
  - (void)version:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)tokenCount:(NSString *)text resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)calculateCost:(nonnull NSNumber *)tokensIn tokensOut:(nonnull NSNumber *)tokensOut providerName:(NSString *)providerName costRulesJson:(NSString *)costRulesJson resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ // Guidelines
+ - (void)guidelinesIngest:(NSString *)json resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)guidelinesScores:(NSString *)query topK:(nonnull NSNumber *)topK method:(NSString *)method resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)guidelinesSave:(NSString *)name json:(NSString *)json resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)guidelinesLoad:(NSString *)name resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+ - (void)guidelinesBuildEmbeddings:(NSString *)method resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
 @end
 
 @implementation PantherModule
@@ -224,6 +230,53 @@ RCT_REMAP_METHOD(version,
   NSString* res = [NSString stringWithUTF8String:out];
   panther_free_string(out);
   resolve(res);
+}
+
+// --- Guidelines ---
+RCT_REMAP_METHOD(guidelinesIngest,
+                 guidelinesIngestWithJson:(NSString *)json
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  int32_t n = panther_guidelines_ingest_json([json UTF8String]);
+  resolve(@(n));
+}
+RCT_REMAP_METHOD(guidelinesScores,
+                 guidelinesScoresWithQuery:(NSString *)query
+                 topK:(nonnull NSNumber *)topK
+                 method:(NSString *)method
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  char* out = panther_guidelines_similarity([query UTF8String], (int32_t)[topK intValue], [method UTF8String]);
+  NSString* res = [NSString stringWithUTF8String:out];
+  panther_free_string(out);
+  resolve(res);
+}
+RCT_REMAP_METHOD(guidelinesSave,
+                 guidelinesSaveWithName:(NSString *)name
+                 json:(NSString *)json
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  int rc = panther_guidelines_save_json([name UTF8String], [json UTF8String]);
+  if (rc == 0) resolve(@(rc)); else reject(@"ERR_GUIDE_SAVE", @"save failed", nil);
+}
+RCT_REMAP_METHOD(guidelinesLoad,
+                 guidelinesLoadWithName:(NSString *)name
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  int32_t n = panther_guidelines_load([name UTF8String]);
+  resolve(@(n));
+}
+RCT_REMAP_METHOD(guidelinesBuildEmbeddings,
+                 guidelinesBuildEmbeddingsWithMethod:(NSString *)method
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  int32_t n = panther_guidelines_embeddings_build([method UTF8String]);
+  resolve(@(n));
 }
 
 @end

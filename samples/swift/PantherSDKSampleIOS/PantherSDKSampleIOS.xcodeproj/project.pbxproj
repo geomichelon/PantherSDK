@@ -13,6 +13,8 @@
     A00000200000000000000001 /* PantherBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001D0000000000000001 /* PantherBridge.swift */; };
     A00000210000000000000001 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001E0000000000000001 /* Models.swift */; };
     A00000220000000000000001 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001F0000000000000001 /* Components.swift */; };
+    A00000230000000000000001 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000250000000000000001 /* AppSession.swift */; };
+    A00000240000000000000001 /* RootTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000260000000000000001 /* RootTabs.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -37,6 +39,8 @@
     A000001D0000000000000001 /* PantherBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PantherBridge.swift; sourceTree = "<group>"; };
     A000001E0000000000000001 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
     A000001F0000000000000001 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+    A00000250000000000000001 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+    A00000260000000000000001 /* RootTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabs.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,6 +80,8 @@
             A000001D0000000000000001 /* PantherBridge.swift */,
             A000001E0000000000000001 /* Models.swift */,
             A000001F0000000000000001 /* Components.swift */,
+            A00000250000000000000001 /* AppSession.swift */,
+            A00000260000000000000001 /* RootTabs.swift */,
         );
         path = PantherSDKSampleIOS;
         sourceTree = "<group>";
@@ -157,6 +163,8 @@
             A00000200000000000000001 /* PantherBridge.swift in Sources */,
             A00000210000000000000001 /* Models.swift in Sources */,
             A00000220000000000000001 /* Components.swift in Sources */,
+            A00000230000000000000001 /* AppSession.swift in Sources */,
+            A00000240000000000000001 /* RootTabs.swift in Sources */,
         );
         runOnlyForDeploymentPostprocessing = 0;
     };

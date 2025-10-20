@@ -43,11 +43,50 @@ enum PantherBridge {
     }
 
     static func loadGuidelinesFromURL(_ url: String, completion: @escaping (String?) -> Void) {
-        guard let u = URL(string: url) else { completion(nil); return }
+        // Support http(s), and naive s3:// / gs:// mapping to public endpoints
+        func mapSpecial(_ s: String) -> URL? {
+            if s.hasPrefix("s3://") {
+                // s3://bucket/key -> https://bucket.s3.amazonaws.com/key
+                let rest = s.dropFirst(5)
+                if let slash = rest.firstIndex(of: "/") {
+                    let bucket = rest[..<slash]
+                    let key = rest[slash...].dropFirst()
+                    return URL(string: "https://\(bucket).s3.amazonaws.com/\(key)")
+                }
+            }
+            if s.hasPrefix("gs://") {
+                // gs://bucket/key -> https://storage.googleapis.com/bucket/key
+                let rest = s.dropFirst(5)
+                if let slash = rest.firstIndex(of: "/") {
+                    let bucket = rest[..<slash]
+                    let key = rest[slash...].dropFirst()
+                    return URL(string: "https://storage.googleapis.com/\(bucket)/\(key)")
+                }
+            }
+            return URL(string: s)
+        }
+        guard let u = mapSpecial(url) else { completion(nil); return }
         URLSession.shared.dataTask(with: u) { data, _, _ in
             guard let data = data, let s = String(data: data, encoding: .utf8) else { completion(nil); return }
             completion(s)
         }.resume()
+    }
+
+    // MARK: - Guidelines Similarity
+    static func guidelinesIngest(json: String) -> Int {
+        json.withCString { j in Int(panther_guidelines_ingest_json(j)) }
+    }
+    static func guidelinesScores(query: String, topK: Int = 5, method: String = "bow") -> String {
+        query.withCString { q in method.withCString { m in strPtr(panther_guidelines_similarity(q, Int32(topK), m)) } }
+    }
+    static func guidelinesSave(name: String, json: String) -> Int {
+        name.withCString { n in json.withCString { j in Int(panther_guidelines_save_json(n, j)) } }
+    }
+    static func guidelinesLoad(name: String) -> Int {
+        name.withCString { n in Int(panther_guidelines_load(n)) }
+    }
+    static func guidelinesBuildEmbeddings(method: String) -> Int {
+        method.withCString { m in Int(panther_guidelines_embeddings_build(m)) }
     }
 
     static func anchorProof(apiBase: String, hash: String, completion: @escaping (String) -> Void) {
@@ -109,3 +148,13 @@ private func panther_validation_run_custom_with_proof(_ prompt: UnsafePointer<CC
 @_silgen_name("panther_bias_detect")
 private func panther_bias_detect(_ samplesJson: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
 
+@_silgen_name("panther_guidelines_ingest_json")
+private func panther_guidelines_ingest_json(_ guidelinesJson: UnsafePointer<CChar>) -> Int32
+@_silgen_name("panther_guidelines_similarity")
+private func panther_guidelines_similarity(_ query: UnsafePointer<CChar>, _ topK: Int32, _ method: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
+@_silgen_name("panther_guidelines_save_json")
+private func panther_guidelines_save_json(_ name: UnsafePointer<CChar>, _ json: UnsafePointer<CChar>) -> Int32
+@_silgen_name("panther_guidelines_load")
+private func panther_guidelines_load(_ name: UnsafePointer<CChar>) -> Int32
+@_silgen_name("panther_guidelines_embeddings_build")
+private func panther_guidelines_embeddings_build(_ method: UnsafePointer<CChar>) -> Int32

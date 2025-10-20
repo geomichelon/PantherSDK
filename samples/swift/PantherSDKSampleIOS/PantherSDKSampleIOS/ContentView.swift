@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     enum Mode: String, CaseIterable { case single = "Single", multi = "Multi", proof = "With Proof" }
     enum Provider: String, CaseIterable { case openai = "OpenAI", ollama = "Ollama", anthropic = "Anthropic", `default` = "Default" }
+    @EnvironmentObject private var session: AppSession
 
     @State private var prompt: String = "Explique recomendações seguras de medicamentos na gravidez."
     @State private var mode: Mode = .single
@@ -35,6 +36,11 @@ struct ContentView: View {
     @State private var guidelinesURL: String = ""
     @State private var proofApiBase: String = "http://127.0.0.1:8000"
     @State private var lastAnchorResponse: String = ""
+    @State private var simRows: [SimilarityRow] = []
+    enum SimMethod: String, CaseIterable { case bow = "BOW", jaccard = "Jaccard", hybrid = "Hybrid", embedOpenAI = "Embed(OpenAI)", embedOllama = "Embed(Ollama)" }
+    @State private var simMethod: SimMethod = .bow
+    @State private var indexName: String = "default"
+    @State private var simNotice: String = ""
 
     var body: some View {
         NavigationView {
@@ -52,38 +58,7 @@ struct ContentView: View {
                         ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    Picker("Provider", selection: $provider) {
-                        ForEach(Provider.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-
-                    Group {
-                        if provider == .openai {
-                            TextField("OpenAI API Key", text: $apiKey)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                                .textFieldStyle(.roundedBorder)
-                            TextField("Base URL", text: $openAIBase)
-                                .textFieldStyle(.roundedBorder)
-                            ModelPicker(title: "Model", presets: CostRules.openAIModels, selection: $openAIModel)
-                        } else if provider == .ollama {
-                            TextField("Ollama Base (http://127.0.0.1:11434)", text: $ollamaBase)
-                                .textFieldStyle(.roundedBorder)
-                            ModelPicker(title: "Model", presets: CostRules.ollamaModels, selection: $ollamaModel)
-                        } else if provider == .anthropic {
-                            TextField("Anthropic API Key", text: $anthropicKey)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                                .textFieldStyle(.roundedBorder)
-                            TextField("Base URL (https://api.anthropic.com)", text: $anthropicBase)
-                                .textFieldStyle(.roundedBorder)
-                            ModelPicker(title: "Model", presets: CostRules.anthropicModels, selection: $anthropicModel)
-                        } else {
-                            Text("Usando providers de ambiente (Default)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
+                    // Provider configuration moved to Providers tab (session-backed)
 
                     SectionHeader("Diretrizes")
                     Toggle("Usar diretrizes customizadas (JSON)", isOn: $useCustomGuidelines)
@@ -169,11 +144,66 @@ struct ContentView: View {
                         TextField("https://…/guidelines.json", text: $guidelinesURL)
                             .textFieldStyle(.roundedBorder)
                         Button("Carregar") { loadGuidelinesFromURL() }
+                        Button("Fetch + scores") { fetchAndScore() }
+                    }
+
+                    HStack {
+                        TextField("Nome do índice", text: $indexName).textFieldStyle(.roundedBorder)
+                        Button("Salvar índice") { saveIndex() }
+                        Button("Carregar índice") { loadIndex() }
+                    }
+
+                    Picker("Método", selection: $simMethod) {
+                        ForEach(SimMethod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }.pickerStyle(.segmented)
+
+                    if !simRows.isEmpty {
+                        SectionHeader("Similarity Scores")
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(simRows) { r in
+                                HStack {
+                                    Text(r.topic).font(.subheadline)
+                                    Spacer()
+                                    let detail = "(" + (r.bow.map { String(format: "bow %.3f", $0) } ?? "") + (r.jaccard.map { String(format: ", jac %.3f", $0) } ?? "") + ")"
+                                    Text(String(format: "%.3f %@", r.score, detail)).monospaced()
+                                }
+                                    .padding(8)
+                                    .background(Color(.tertiarySystemBackground))
+                                    .cornerRadius(6)
+                            }
+                        }
+                        if !simNotice.isEmpty {
+                            Text(simNotice).font(.caption).foregroundColor(.secondary)
+                        }
                     }
                 }
                 .padding()
             }
-            .navigationTitle("PantherSDK")
+            .navigationTitle("Validate")
+        }
+        .onAppear {
+            // Sync local provider fields from session to keep consistency across tabs
+            switch session.provider {
+            case .openai:
+                provider = .openai
+                apiKey = session.openAIKey
+                openAIBase = session.openAIBase
+                openAIModel = session.openAIModel
+            case .ollama:
+                provider = .ollama
+                ollamaBase = session.ollamaBase
+                ollamaModel = session.ollamaModel
+            case .anthropic:
+                provider = .anthropic
+                anthropicBase = session.anthropicBase
+                anthropicModel = session.anthropicModel
+                anthropicKey = session.anthropicKey
+            case .default:
+                provider = .default
+            }
+            // Default to OpenAI embed if key present
+            let hasKey = ProcessInfo.processInfo.environment["PANTHER_OPENAI_API_KEY"].map { !$0.isEmpty } ?? false
+            if hasKey { simMethod = .embedOpenAI }
         }
         .sheet(isPresented: $showCostRules) {
             NavigationView {
@@ -204,21 +234,23 @@ struct ContentView: View {
             let output: String
             switch mode {
             case .single:
-                switch provider {
-                case .openai: output = callOpenAI(prompt: prompt, apiKey: apiKey, model: openAIModel, base: openAIBase)
-                case .ollama: output = callOllama(prompt: prompt, base: ollamaBase, model: ollamaModel)
+                switch session.provider {
+                case .openai:
+                    output = callOpenAI(prompt: prompt, apiKey: session.openAIKey, model: session.openAIModel, base: session.openAIBase)
+                case .ollama:
+                    output = callOllama(prompt: prompt, base: session.ollamaBase, model: session.ollamaModel)
                 case .anthropic:
-                    // Use multi path with single entry
-                    let arr: [[String: String]] = [["type": "anthropic", "api_key": anthropicKey, "model": anthropicModel, "base_url": anthropicBase]]
+                    let arr: [[String: String]] = [["type": "anthropic", "api_key": session.anthropicKey, "model": session.anthropicModel, "base_url": session.anthropicBase]]
                     let data = try? JSONSerialization.data(withJSONObject: arr)
                     let singleJSON = String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
                     output = callMulti(prompt: prompt, providersJSON: singleJSON, withProof: false)
-                case .default: output = callDefault(prompt: prompt)
+                case .default:
+                    output = callDefault(prompt: prompt)
                 }
             case .multi:
-                output = callMulti(prompt: prompt, providersJSON: buildProvidersJSON(), withProof: false)
+                output = callMulti(prompt: prompt, providersJSON: session.providersJSON(), withProof: false)
             case .proof:
-                output = callMulti(prompt: prompt, providersJSON: buildProvidersJSON(), withProof: true)
+                output = callMulti(prompt: prompt, providersJSON: session.providersJSON(), withProof: true)
             }
             DispatchQueue.main.async {
                 isRunning = false
@@ -320,6 +352,51 @@ struct ContentView: View {
                 self.useCustomGuidelines = true
             }
         }
+    }
+
+    private func fetchAndScore() {
+        PantherBridge.loadGuidelinesFromURL(guidelinesURL) { s in
+            guard let s = s else { return }
+            let n = PantherBridge.guidelinesIngest(json: s)
+            guard n > 0 else { return }
+            var method = simMethod.rawValue.lowercased()
+            if simMethod == .embedOpenAI { method = "embed-openai" }
+            if simMethod == .embedOllama { method = "embed-ollama" }
+            if simMethod == .embedOpenAI || simMethod == .embedOllama {
+                // pre-check OpenAI key presence when chosen
+                if simMethod == .embedOpenAI {
+                    let hasKey = ProcessInfo.processInfo.environment["PANTHER_OPENAI_API_KEY"].map { !$0.isEmpty } ?? false
+                    if !hasKey { self.simNotice = "PANTHER_OPENAI_API_KEY ausente; usando BOW como fallback"; method = "bow" }
+                }
+                if method.starts(with: "embed-") { _ = PantherBridge.guidelinesBuildEmbeddings(method: method) }
+            }
+            let out = PantherBridge.guidelinesScores(query: prompt, topK: 5, method: method)
+            if let data = out.data(using: .utf8), let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                let rows = arr.compactMap { d -> SimilarityRow? in
+                    let t = d["topic"] as? String ?? ""
+                    let sc = d["score"] as? Double ?? 0
+                    let bow = d["bow"] as? Double
+                    let jac = d["jaccard"] as? Double
+                    return SimilarityRow(topic: t, score: sc, bow: bow, jaccard: jac)
+                }
+                DispatchQueue.main.async { self.simRows = rows }
+            }
+        }
+    }
+
+    private func saveIndex() {
+        guard !indexName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let json = useCustomGuidelines ? customGuidelines : (try? String(contentsOf: URL(string: guidelinesURL)!)) ?? ""
+        guard !json.isEmpty else { return }
+        let rc = PantherBridge.guidelinesSave(name: indexName, json: json)
+        print("guidelinesSave rc=", rc)
+    }
+
+    private func loadIndex() {
+        guard !indexName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let n = PantherBridge.guidelinesLoad(name: indexName)
+        print("guidelinesLoad n=", n)
+        if n > 0 { fetchAndScore() }
     }
 
     private func extractCombinedHash() -> String? {

@@ -28,3 +28,11 @@ enum CostRules {
     ]
     """
 }
+
+struct SimilarityRow: Identifiable {
+    let id = UUID()
+    let topic: String
+    let score: Double
+    let bow: Double?
+    let jaccard: Double?
+}

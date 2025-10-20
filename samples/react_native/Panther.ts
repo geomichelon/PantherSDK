@@ -17,6 +17,12 @@ type PantherModuleType = {
   validateCustom(prompt: string, providersJson: string, guidelinesJson: string): Promise<string>;
   tokenCount(text: string): Promise<number>;
   calculateCost(tokensIn: number, tokensOut: number, providerName: string, costRulesJson: string): Promise<number>;
+  // Guidelines
+  guidelinesIngest(json: string): Promise<number>;
+  guidelinesScores(query: string, topK: number, method: string): Promise<string>;
+  guidelinesSave(name: string, json: string): Promise<number>;
+  guidelinesLoad(name: string): Promise<number>;
+  guidelinesBuildEmbeddings(method: string): Promise<number>;
 };
 
 const {PantherModule} = NativeModules as {PantherModule: PantherModuleType};
@@ -83,6 +89,23 @@ export async function tokenCount(text: string): Promise<number> {
 
 export async function calculateCost(tokensIn: number, tokensOut: number, providerName: string, costRulesJson: string): Promise<number> {
   return PantherModule.calculateCost(tokensIn, tokensOut, providerName, costRulesJson);
+}
+
+// --- Guidelines ---
+export async function guidelinesIngest(json: string): Promise<number> {
+  return PantherModule.guidelinesIngest(json);
+}
+export async function guidelinesScores(query: string, topK: number, method: string): Promise<string> {
+  return PantherModule.guidelinesScores(query, topK, method);
+}
+export async function guidelinesSave(name: string, json: string): Promise<number> {
+  return PantherModule.guidelinesSave(name, json);
+}
+export async function guidelinesLoad(name: string): Promise<number> {
+  return PantherModule.guidelinesLoad(name);
+}
+export async function guidelinesBuildEmbeddings(method: string): Promise<number> {
+  return PantherModule.guidelinesBuildEmbeddings(method);
 }
 
 export async function anchorProof(hash: string, apiBase?: string, apiKey?: string): Promise<{tx_hash?: string; error?: string}> {

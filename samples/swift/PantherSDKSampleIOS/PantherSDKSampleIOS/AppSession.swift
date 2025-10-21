@@ -14,6 +14,12 @@ final class AppSession: ObservableObject {
     @Published var anthropicModel: String = "claude-3-5-sonnet-latest"
     @Published var anthropicKey: String = ""
 
+    // Advanced: allow overriding providers JSON for Multi/Proof
+    @Published var useAdvancedProvidersJSON: Bool = false
+    @Published var advancedProvidersJSON: String = ""
+
+    // No multi-LLM visual builder; use JSON avançado para múltiplos
+
     private let d = UserDefaults.standard
     private enum K {
         static let provider = "ps.provider"
@@ -25,6 +31,8 @@ final class AppSession: ObservableObject {
         static let anthropicBase = "ps.anth.base"
         static let anthropicModel = "ps.anth.model"
         static let anthropicKey = "ps.anth.key"
+        static let useAdv = "ps.providers.use_adv"
+        static let advJson = "ps.providers.adv_json"
     }
 
     func load() {
@@ -37,6 +45,9 @@ final class AppSession: ObservableObject {
         anthropicBase = d.string(forKey: K.anthropicBase) ?? anthropicBase
         anthropicModel = d.string(forKey: K.anthropicModel) ?? anthropicModel
         anthropicKey = d.string(forKey: K.anthropicKey) ?? anthropicKey
+        useAdvancedProvidersJSON = d.object(forKey: K.useAdv) as? Bool ?? false
+        advancedProvidersJSON = d.string(forKey: K.advJson) ?? advancedProvidersJSON
+        // no-op: multi UI removed
     }
 
     func save() {
@@ -49,9 +60,20 @@ final class AppSession: ObservableObject {
         d.set(anthropicBase, forKey: K.anthropicBase)
         d.set(anthropicModel, forKey: K.anthropicModel)
         d.set(anthropicKey, forKey: K.anthropicKey)
+        d.set(useAdvancedProvidersJSON, forKey: K.useAdv)
+        d.set(advancedProvidersJSON, forKey: K.advJson)
+        // no-op: multi UI removed
     }
 
-    func providersJSON(includeDefault: Bool = true) -> String {
+    func providersJSON(includeDefault: Bool = false) -> String {
+        // If user enabled the advanced JSON and it's valid JSON array, return it
+        if useAdvancedProvidersJSON {
+            let s = advancedProvidersJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let data = s.data(using: .utf8),
+               (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] != nil {
+                return s
+            }
+        }
         var arr: [[String: String]] = []
         switch provider {
         case .openai:
@@ -63,9 +85,7 @@ final class AppSession: ObservableObject {
         case .default:
             break
         }
-        if includeDefault { arr.append(["type": "default", "model": "anvisa", "base_url": ""]) }
         let data = try? JSONSerialization.data(withJSONObject: arr)
         return String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
     }
 }
-

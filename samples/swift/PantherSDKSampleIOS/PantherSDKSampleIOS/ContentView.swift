@@ -22,6 +22,12 @@ struct ContentView: View {
 
     @State private var useCustomGuidelines: Bool = false
     @State private var customGuidelines: String = ""
+    @FocusState private var guidelinesFocused: Bool
+    private var isGuidelinesJSONValid: Bool {
+        let s = customGuidelines.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty, let data = s.data(using: .utf8) else { return false }
+        return (try? JSONSerialization.jsonObject(with: data)) != nil
+    }
 
     @State private var showCostRules: Bool = false
     @State private var costRulesJson: String = CostRules.defaultJSON
@@ -41,6 +47,7 @@ struct ContentView: View {
     @State private var simMethod: SimMethod = .bow
     @State private var indexName: String = "default"
     @State private var simNotice: String = ""
+    @State private var showHelp: Bool = false
 
     var body: some View {
         NavigationView {
@@ -64,11 +71,26 @@ struct ContentView: View {
                     Toggle("Usar diretrizes customizadas (JSON)", isOn: $useCustomGuidelines)
                     if useCustomGuidelines {
                         TextEditor(text: $customGuidelines)
+                            .focused($guidelinesFocused)
                             .frame(minHeight: 90)
                             .padding(8)
                             .background(Color(.secondarySystemBackground))
                             .cornerRadius(8)
                             .font(.caption)
+                        let trimmed = customGuidelines.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmed.isEmpty {
+                            Text("JSON vazio — usando ANVISA (fallback)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else if !isGuidelinesJSONValid {
+                            Text("JSON inválido — não é JSON válido")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        } else {
+                            Text("JSON válido")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
                     } else {
                         Text("ANVISA (padrão embutido)")
                             .font(.caption)
@@ -179,8 +201,19 @@ struct ContentView: View {
                 }
                 .padding()
             }
+            .simultaneousGesture(TapGesture().onEnded { guidelinesFocused = false })
             .navigationTitle("Validate")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showHelp = true } label: { Image(systemName: "questionmark.circle") }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Fechar") { guidelinesFocused = false }
+                }
+            }
         }
+        .sheet(isPresented: $showHelp) { NavigationView { HelpView() } }
         .onAppear {
             // Sync local provider fields from session to keep consistency across tabs
             switch session.provider {
@@ -206,23 +239,7 @@ struct ContentView: View {
             if hasKey { simMethod = .embedOpenAI }
         }
         .sheet(isPresented: $showCostRules) {
-            NavigationView {
-                VStack(alignment: .leading) {
-                    TextEditor(text: $costRulesJson)
-                        .font(.system(.footnote, design: .monospaced))
-                        .padding(8)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(8)
-                    HStack {
-                        Button("Restaurar Padrão") { costRulesJson = CostRules.defaultJSON }
-                        Spacer()
-                        Button("Fechar") { showCostRules = false }
-                            .buttonStyle(.borderedProminent)
-                    }
-                }
-                .padding()
-                .navigationTitle("Tabela de Custos")
-            }
+            NavigationView { CostRulesInlineEditor(costRulesJson: $costRulesJson) }
         }
     }
 
@@ -271,7 +288,6 @@ struct ContentView: View {
         case .default:
             break
         }
-        arr.append(["type": "default", "model": "anvisa", "base_url": ""]) // comparação
         let data = try? JSONSerialization.data(withJSONObject: arr)
         return String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
     }

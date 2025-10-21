@@ -14,8 +14,9 @@ struct ModelPicker: View {
     var body: some View {
         VStack(alignment: .leading) {
             Text(title).font(.subheadline)
-            Picker(title, selection: $selection) { ForEach(presets, id: \.self) { Text($0).tag($0) } }
+            Picker("", selection: $selection) { ForEach(presets, id: \.self) { Text($0).tag($0) } }
                 .pickerStyle(.menu)
+                .labelsHidden()
             TextField("Custom", text: $selection).textFieldStyle(.roundedBorder)
         }
     }
@@ -55,3 +56,27 @@ struct ResultCard: View {
         .cornerRadius(10)
     }
 }
+
+// Inline cost rules editor used from Validate via NavigationLink
+struct CostRulesInlineEditor: View {
+    @Binding var costRulesJson: String
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        VStack(alignment: .leading) {
+            TextEditor(text: $costRulesJson)
+                .font(.system(.footnote, design: .monospaced))
+                .padding(8)
+                .background(Color(UIColor.secondarySystemBackground))
+                .cornerRadius(8)
+            HStack {
+                Button("Restaurar Padrão") { costRulesJson = CostRules.defaultJSON }
+                Spacer()
+                Button("Fechar") { dismiss() }.buttonStyle(.borderedProminent)
+            }
+        }
+        .padding()
+        .navigationTitle("Tabela de Custos")
+    }
+}
+
+// MultiProviderRow removido: UI de múltiplos LLMs foi retirada

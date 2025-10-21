@@ -19,6 +19,33 @@ What’s Included (PoC summary)
 - Bias and content metrics (BLEU, ROUGE‑L, accuracy, fluency, diversity, plagiarism)
 - Samples for iOS (Swift), Android (Kotlin), Flutter (Dart FFI) e React Native (Android/iOS)
 
+iOS Sample — Tabs Overview
+- LLMs
+  - Selecione e configure os LLMs (OpenAI/Ollama/Anthropic) usados na validação (Single).
+  - “Salvar sessão” persiste as credenciais/modelos no `UserDefaults`.
+  - “LLMs (JSON avançado)”: edite manualmente a lista usada em Multi/With Proof. Exemplo (OpenAI chatgpt‑5 + gpt‑4o):
+    ```json
+    [
+      { "type": "openai", "api_key": "sk-…", "base_url": "https://api.openai.com", "model": "chatgpt-5" },
+      { "type": "openai", "api_key": "sk-…", "base_url": "https://api.openai.com", "model": "gpt-4o" }
+    ]
+    ```
+  - Estimativa de custos: “Editar Tabela” abre um editor da tabela de preços por modelo (utilizada para estimar custo por resultado).
+  - ![Providers](docs/images/providers.png)
+
+- Validate
+  - Prompt + modo de execução:
+    - Single: executa somente o provider selecionado na aba Providers.
+    - Multi: executa em paralelo todos os LLMs do JSON avançado (se fornecido). Caso contrário, usa apenas o LLM selecionado.
+    - With Proof: igual ao Multi, mas retorna também um objeto `proof` (hash combinado) para auditoria/âncora.
+  - Diretrizes: opcionalmente use um JSON customizado (senão usa ANVISA embutido). Os modos Multi/Proof também possuem variantes `validateCustom*` quando diretrizes customizadas estão ativas.
+  - Similarity (na mesma tela): carregar diretrizes por URL, salvar/carregar um índice nomeado e calcular “similarity” (BOW/Jaccard/Hybrid/Embeddings) com `topK`.
+  - Tokens e custo: a tela estima custo por provider com base na contagem de tokens e na tabela de preços.
+  - ![Validate](docs/images/validate.png)
+
+Observação sobre o sample
+- Para Multi-provider, utilize “LLMs (JSON avançado)” na aba LLMs para compor a lista.
+
 Repository Structure
 - `Cargo.toml` (Rust workspace)
 - `crates/`

@@ -20,6 +20,10 @@ panther-providers = { path = "../panther-providers" }
 panther-observability = { path = "../panther-observability" }
 panthersdk = { path = "../../panthersdk" }
 panther-agents = { path = "../panther-agents", optional = true }
+<<<<<<< HEAD
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"], optional = true }
+=======
+>>>>>>> origin/main
 
 [features]
 default = []
@@ -44,6 +48,11 @@ agents-openai = ["agents", "panther-agents/validation-openai"]
 agents-ollama = ["agents", "panther-agents/validation-ollama"]
 agents-openai-async = ["agents", "panther-agents/validation-openai-async"]
 agents-ollama-async = ["agents", "panther-agents/validation-ollama-async"]
+<<<<<<< HEAD
+guidelines-embed-openai = ["dep:reqwest"]
+guidelines-embed-ollama = ["dep:reqwest"]
+=======
+>>>>>>> origin/main
 
 [dependencies.panther-metrics]
 path = "../panther-metrics"

@@ -9,6 +9,7 @@ use panther_domain::ports::KeyValueStore;
 use panthersdk as _; // ensure linkage to panthersdk for metrics/bias helpers
 use std::ffi::CStr;
 use std::os::raw::c_char;
+use std::collections::{HashMap, HashSet};
 
 static ENGINE: OnceCell<Engine> = OnceCell::new();
 static LOGS: OnceCell<std::sync::Mutex<Vec<String>>> = OnceCell::new();
@@ -287,6 +288,318 @@ pub extern "C" fn panther_token_count(text: *const c_char) -> i32 {
     t.split_whitespace().count() as i32
 }
 
+<<<<<<< HEAD
+// ---------- Guidelines Similarity (MVP: BOW cosine) ----------
+static GUIDELINES_INDEX: OnceCell<std::sync::Mutex<Vec<(String, HashMap<String, f64>, HashSet<String>)>>> = OnceCell::new();
+static GUIDELINES_RAW: OnceCell<std::sync::Mutex<Vec<String>>> = OnceCell::new();
+
+fn tokenize(s: &str) -> Vec<String> {
+    s.split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .map(|t| t.to_lowercase())
+        .collect()
+}
+
+fn vec_from_text(s: &str) -> HashMap<String, f64> {
+    let mut map: HashMap<String, f64> = HashMap::new();
+    for tok in tokenize(s) { *map.entry(tok).or_insert(0.0) += 1.0; }
+    let norm = map.values().map(|v| v*v).sum::<f64>().sqrt();
+    if norm > 0.0 { for v in map.values_mut() { *v /= norm; } }
+    map
+}
+
+fn set_from_text(s: &str) -> HashSet<String> {
+    tokenize(s).into_iter().collect()
+}
+
+fn cosine(a: &HashMap<String, f64>, b: &HashMap<String, f64>) -> f64 {
+    let (small, large) = if a.len() <= b.len() { (a, b) } else { (b, a) };
+    let mut dot = 0.0;
+    for (k, va) in small.iter() {
+        if let Some(vb) = large.get(k) { dot += va * vb; }
+    }
+    dot
+}
+
+#[no_mangle]
+pub extern "C" fn panther_guidelines_ingest_json(guidelines_json_c: *const c_char) -> i32 {
+    if guidelines_json_c.is_null() { return 0; }
+    let s = unsafe { CStr::from_ptr(guidelines_json_c).to_string_lossy().into_owned() };
+    let mut items: Vec<(String, HashMap<String, f64>, HashSet<String>)> = Vec::new();
+    let mut raws: Vec<String> = Vec::new();
+    // Accept array of objects with {topic, expected_terms[]} or array of strings
+    let v: Result<serde_json::Value, _> = serde_json::from_str(&s);
+    match v {
+        Ok(serde_json::Value::Array(arr)) => {
+            for it in arr {
+                match it {
+                    serde_json::Value::Object(obj) => {
+                        let topic = obj.get("topic").and_then(|x| x.as_str()).unwrap_or("");
+                        let expected = obj.get("expected_terms").and_then(|x| x.as_array()).map(|a| {
+                            a.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(" ")
+                        }).unwrap_or_default();
+                        let combined = if expected.is_empty() { topic.to_string() } else { format!("{} {}", topic, expected) };
+                        let vec = vec_from_text(&combined);
+                        let setv = set_from_text(&combined);
+                        items.push((topic.to_string(), vec, setv));
+                        raws.push(combined);
+                    }
+                    serde_json::Value::String(txt) => {
+                        let vec = vec_from_text(&txt);
+                        let setv = set_from_text(&txt);
+                        raws.push(txt.clone());
+                        items.push((txt, vec, setv));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        _ => { return 0; }
+    }
+    let m = GUIDELINES_INDEX.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+    if let Ok(mut guard) = m.lock() {
+        *guard = items;
+        if let Some(buf) = LOGS.get() { let _ = buf.lock().map(|mut v| v.push("guidelines_ingest".to_string())); }
+        // store raws in parallel OnceCell
+        let raw_m = GUIDELINES_RAW.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+        if let Ok(mut r) = raw_m.lock() { *r = raws; }
+        return guard.len() as i32;
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn panther_guidelines_similarity(query_c: *const c_char, top_k: i32, method_c: *const c_char) -> *mut std::os::raw::c_char {
+    if query_c.is_null() { return rust_string_to_c("[]".to_string()); }
+    let method = unsafe { if method_c.is_null() { "bow".to_string() } else { CStr::from_ptr(method_c).to_string_lossy().into_owned() } };
+    let q = unsafe { CStr::from_ptr(query_c).to_string_lossy().into_owned() };
+    let qv = vec_from_text(&q);
+    let qs = set_from_text(&q);
+    let k = if top_k <= 0 { 5 } else { top_k as usize };
+    if method == "embed-openai" || method == "embed-ollama" {
+        // Embedding-based path
+        return crate::embed::similarity_embed(&q, k, &method);
+    }
+    if let Some(mtx) = GUIDELINES_INDEX.get() {
+        if let Ok(idx) = mtx.lock() {
+            let mut outv: Vec<(String, f64, f64, f64)> = Vec::new();
+            for (id, vec, setv) in idx.iter() {
+                let bow = cosine(&qv, vec);
+                let inter = qs.intersection(setv).count() as f64;
+                let union = qs.union(setv).count() as f64;
+                let jacc = if union > 0.0 { inter / union } else { 0.0 };
+                let hybrid = 0.6 * bow + 0.4 * jacc;
+                let score = match method.as_str() { "bow" => bow, "jaccard" => jacc, "hybrid" => hybrid, _ => bow };
+                outv.push((id.clone(), score, bow, jacc));
+            }
+            outv.sort_by(|a,b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            let out: Vec<serde_json::Value> = outv.into_iter().take(k).map(|(id,score,bow,jacc)| serde_json::json!({"topic": id, "score": score, "bow": bow, "jaccard": jacc})).collect();
+            if let Some(buf) = LOGS.get() { let _ = buf.lock().map(|mut v| v.push("guidelines_similarity".to_string())); }
+            return rust_string_to_c(serde_json::to_string(&out).unwrap_or_else(|_| "[]".to_string()));
+        }
+    }
+    rust_string_to_c("[]".to_string())
+}
+
+// Persist raw guidelines JSON for reuse
+#[no_mangle]
+pub extern "C" fn panther_guidelines_save_json(name_c: *const c_char, json_c: *const c_char) -> i32 {
+    if name_c.is_null() || json_c.is_null() { return 1; }
+    if let Some(store) = STORAGE.get() {
+        let s: &dyn KeyValueStore = &**store;
+        let name = unsafe { CStr::from_ptr(name_c).to_string_lossy().into_owned() };
+        let json = unsafe { CStr::from_ptr(json_c).to_string_lossy().into_owned() };
+        let key = format!("guidelines:{}", name);
+        match s.set(&key, json) { Ok(_) => 0, Err(_) => 1 }
+    } else { 2 }
+}
+
+#[no_mangle]
+pub extern "C" fn panther_guidelines_load(name_c: *const c_char) -> i32 {
+    if name_c.is_null() { return 0; }
+    if let Some(store) = STORAGE.get() {
+        let s: &dyn KeyValueStore = &**store;
+        let name = unsafe { CStr::from_ptr(name_c).to_string_lossy().into_owned() };
+        let key = format!("guidelines:{}", name);
+        match s.get(&key) {
+            Ok(Some(json)) => panther_guidelines_ingest_json(std::ffi::CString::new(json).unwrap().as_ptr()),
+            _ => 0,
+        }
+    } else { 0 }
+}
+
+// ---------- Embeddings (optional) ----------
+mod embed {
+    use super::*;
+    use once_cell::sync::OnceCell;
+
+    struct EmbedIndex { method: String, vectors: Vec<Vec<f32>> }
+    static EMBED_INDEX: OnceCell<std::sync::Mutex<Option<EmbedIndex>>> = OnceCell::new();
+
+    fn normalize(v: &mut Vec<f32>) {
+        let norm = (v.iter().map(|x| (*x as f64)*(*x as f64)).sum::<f64>()).sqrt();
+        if norm > 0.0 {
+            let inv = 1.0 / norm as f32;
+            for x in v.iter_mut() { *x *= inv; }
+        }
+    }
+    fn dot(a: &[f32], b: &[f32]) -> f64 {
+        let (small, large) = if a.len() <= b.len() { (a,b) } else { (b,a) };
+        let mut s = 0.0f64;
+        for (i, x) in small.iter().enumerate() { s += (*x as f64) * (large[i] as f64); }
+        s
+    }
+
+    #[cfg(feature = "guidelines-embed-openai")]
+    async fn embed_openai(texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
+        let base = std::env::var("PANTHER_OPENAI_BASE").unwrap_or_else(|_| "https://api.openai.com".to_string());
+        let key = std::env::var("PANTHER_OPENAI_API_KEY").map_err(|_| anyhow::anyhow!("missing PANTHER_OPENAI_API_KEY"))?;
+        let model = std::env::var("PANTHER_OPENAI_EMBED_MODEL").unwrap_or_else(|_| "text-embedding-3-small".to_string());
+        let client = reqwest::Client::new();
+        let url = format!("{}/v1/embeddings", base.trim_end_matches('/'));
+        #[derive(serde::Serialize)] struct Req<'a> { input: &'a [String], model: String }
+        let resp = client.post(&url)
+            .bearer_auth(key)
+            .json(&Req { input: texts, model })
+            .send().await?;
+        let val: serde_json::Value = resp.json().await?;
+        let mut out: Vec<Vec<f32>> = Vec::new();
+        if let Some(arr) = val.get("data").and_then(|v| v.as_array()) {
+            for d in arr {
+                let vec = d.get("embedding").and_then(|e| e.as_array()).map(|a| {
+                    a.iter().filter_map(|x| x.as_f64().map(|f| f as f32)).collect::<Vec<f32>>()
+                }).unwrap_or_default();
+                out.push(vec);
+            }
+        }
+        Ok(out)
+    }
+
+    #[cfg(not(feature = "guidelines-embed-openai"))]
+    async fn embed_openai(_texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> { Err(anyhow::anyhow!("openai embed feature not enabled")) }
+
+    #[cfg(feature = "guidelines-embed-ollama")]
+    async fn embed_ollama(texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
+        let base = std::env::var("PANTHER_OLLAMA_BASE").unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
+        let model = std::env::var("PANTHER_OLLAMA_EMBED_MODEL").unwrap_or_else(|_| "nomic-embed-text".to_string());
+        let client = reqwest::Client::new();
+        let url = format!("{}/api/embeddings", base.trim_end_matches('/'));
+        let mut out: Vec<Vec<f32>> = Vec::new();
+        for t in texts {
+            let resp = client.post(&url).json(&serde_json::json!({"model": model, "prompt": t})).send().await?;
+            let val: serde_json::Value = resp.json().await?;
+            let vec = val.get("embedding").and_then(|e| e.as_array()).map(|a| a.iter().filter_map(|x| x.as_f64().map(|f| f as f32)).collect::<Vec<f32>>()).unwrap_or_default();
+            out.push(vec);
+        }
+        Ok(out)
+    }
+
+    #[cfg(not(feature = "guidelines-embed-ollama"))]
+    async fn embed_ollama(_texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> { Err(anyhow::anyhow!("ollama embed feature not enabled")) }
+
+    fn build_rt() -> Result<tokio::runtime::Runtime, ()> {
+        tokio::runtime::Builder::new_multi_thread().enable_all().build().map_err(|_| ())
+    }
+
+    pub fn similarity_embed(query: &str, k: usize, method: &str) -> *mut std::os::raw::c_char {
+        // Build index if missing
+        let mtx = EMBED_INDEX.get_or_init(|| std::sync::Mutex::new(None));
+        // Ensure we have raw texts
+        let raws_m = super::GUIDELINES_RAW.get();
+        let raws: Vec<String> = if let Some(r) = raws_m { r.lock().ok().map(|g| g.clone()).unwrap_or_default() } else { Vec::new() };
+        if raws.is_empty() {
+            return rust_string_to_c("[]".to_string());
+        }
+        // Build if empty or mismatched method
+        let need_build = {
+            if let Ok(guard) = mtx.lock() {
+                match &*guard { Some(ei) if ei.method == method => false, _ => true }
+            } else { true }
+        };
+        if need_build {
+            if let Ok(rt) = build_rt() {
+                let built = rt.block_on(async {
+                    let vecs = match method {
+                        "embed-openai" => embed_openai(&raws).await,
+                        "embed-ollama" => embed_ollama(&raws).await,
+                        _ => Err(anyhow::anyhow!("unknown method")),
+                    }?;
+                    let mut vecs = vecs;
+                    for v in vecs.iter_mut() { normalize(v); }
+                    Ok::<Vec<Vec<f32>>, anyhow::Error>(vecs)
+                });
+                if let Ok(vecs) = built {
+                    if let Ok(mut guard) = mtx.lock() { *guard = Some(EmbedIndex { method: method.to_string(), vectors: vecs }); }
+                } else {
+                    return rust_string_to_c("[]".to_string());
+                }
+            } else {
+                return rust_string_to_c("[]".to_string());
+            }
+        }
+        // Compute query embedding
+        let q_vec: Vec<f32> = if let Ok(rt) = build_rt() {
+            let out = rt.block_on(async {
+                let v = match method {
+                    "embed-openai" => embed_openai(&vec![query.to_string()]).await,
+                    "embed-ollama" => embed_ollama(&vec![query.to_string()]).await,
+                    _ => Err(anyhow::anyhow!("unknown method")),
+                }?;
+                Ok::<Vec<f32>, anyhow::Error>(v.into_iter().next().unwrap_or_default())
+            });
+            match out { Ok(mut v) => { normalize(&mut v); v }, Err(_) => Vec::new() }
+        } else { Vec::new() };
+        if q_vec.is_empty() { return rust_string_to_c("[]".to_string()); }
+        // Score
+        if let Ok(guard) = mtx.lock() {
+            if let Some(ei) = &*guard {
+                let ids: Vec<String> = if let Some(idx) = super::GUIDELINES_INDEX.get() {
+                    idx.lock().ok().map(|v| v.iter().map(|(id,_,_)| id.clone()).collect()).unwrap_or_default()
+                } else { Vec::new() };
+                let mut scored: Vec<(String, f64)> = Vec::new();
+                for (i, v) in ei.vectors.iter().enumerate() {
+                    let s = dot(&q_vec, v);
+                    let id = ids.get(i).cloned().unwrap_or_else(|| format!("item:{}", i));
+                    scored.push((id, s));
+                }
+                scored.sort_by(|a,b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                let out: Vec<serde_json::Value> = scored.into_iter().take(k).map(|(id,score)| serde_json::json!({"topic": id, "score": score})).collect();
+                return rust_string_to_c(serde_json::to_string(&out).unwrap_or_else(|_| "[]".to_string()));
+            }
+        }
+        rust_string_to_c("[]".to_string())
+    }
+
+    #[no_mangle]
+    pub extern "C" fn panther_guidelines_embeddings_build(method_c: *const c_char) -> i32 {
+        if method_c.is_null() { return 0; }
+        let method = unsafe { CStr::from_ptr(method_c).to_string_lossy().into_owned() };
+        let raws_m = super::GUIDELINES_RAW.get();
+        let raws: Vec<String> = if let Some(r) = raws_m { r.lock().ok().map(|g| g.clone()).unwrap_or_default() } else { Vec::new() };
+        if raws.is_empty() { return 0; }
+        if let Ok(rt) = build_rt() {
+            let built = rt.block_on(async {
+                let vecs = match method.as_str() {
+                    "embed-openai" => embed_openai(&raws).await,
+                    "embed-ollama" => embed_ollama(&raws).await,
+                    _ => Err(anyhow::anyhow!("unknown method")),
+                }?;
+                let mut vecs = vecs;
+                for v in vecs.iter_mut() { normalize(v); }
+                Ok::<Vec<Vec<f32>>, anyhow::Error>(vecs)
+            });
+            if let Ok(vecs) = built {
+                let mtx = EMBED_INDEX.get_or_init(|| std::sync::Mutex::new(None));
+                if let Ok(mut guard) = mtx.lock() { *guard = Some(EmbedIndex { method: method.to_string(), vectors: vecs }); }
+                return raws.len() as i32;
+            }
+        }
+        0
+    }
+}
+
+=======
+>>>>>>> origin/main
 #[derive(serde::Deserialize, Debug)]
 struct CostRuleCompat {
     // Accept both keys: `match` (used by samples) and `provider` (used by tools)
@@ -298,6 +611,14 @@ struct CostRuleCompat {
     usd_per_1k_in: Option<f64>,
     #[serde(default)]
     usd_per_1k_out: Option<f64>,
+<<<<<<< HEAD
+    // Optional alternative: allow prices per million tokens for convenience
+    #[serde(default)]
+    usd_per_1m_in: Option<f64>,
+    #[serde(default)]
+    usd_per_1m_out: Option<f64>,
+=======
+>>>>>>> origin/main
 }
 
 fn select_rule<'a>(prov: &str, rules: &'a [CostRuleCompat]) -> Option<&'a CostRuleCompat> {
@@ -342,8 +663,21 @@ pub extern "C" fn panther_calculate_cost(
         }
     }
     if let Some(rule) = select_rule(&prov, &rules_vec) {
+<<<<<<< HEAD
+        let cin = match (rule.usd_per_1k_in, rule.usd_per_1m_in) {
+            (Some(v), _) => v,
+            (None, Some(m)) => m / 1000.0,
+            _ => 0.0,
+        };
+        let cout = match (rule.usd_per_1k_out, rule.usd_per_1m_out) {
+            (Some(v), _) => v,
+            (None, Some(m)) => m / 1000.0,
+            _ => 0.0,
+        };
+=======
         let cin = rule.usd_per_1k_in.unwrap_or(0.0);
         let cout = rule.usd_per_1k_out.unwrap_or(0.0);
+>>>>>>> origin/main
         let ti = (tokens_in.max(0) as f64) / 1000.0;
         let to = (tokens_out.max(0) as f64) / 1000.0;
         return ti * cin + to * cout;

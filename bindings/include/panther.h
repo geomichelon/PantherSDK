@@ -39,6 +39,16 @@ double panther_calculate_cost(int32_t tokens_in,
                               const char* cost_rules_json);
 char* panther_get_token_metrics(void);
 
+<<<<<<< HEAD
+// Guidelines similarity (MVP + embeddings optional)
+int panther_guidelines_ingest_json(const char* guidelines_json);
+char* panther_guidelines_similarity(const char* query, int32_t top_k, const char* method);
+int panther_guidelines_save_json(const char* name, const char* json);
+int panther_guidelines_load(const char* name);
+int panther_guidelines_embeddings_build(const char* method);
+
+=======
+>>>>>>> origin/main
 #ifdef __cplusplus
 }
 #endif

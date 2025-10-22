@@ -57,8 +57,8 @@ Notes
 Demo Video
 - If you place a demo video at the repo path `docs/media/demo.mp4`, GitHub will render it in the root README. You can also view it from this README via the relative link below:
 
-<video src="../../../docs/media/demo.mov" width="720" controls muted playsinline>
+<video src="../../../docs/media/demo.mp4" width="720" controls muted playsinline>
   Your browser does not support the video tag. See the link below.
 </video>
 
-- Direct link: ../../../docs/media/demo.mov
+- Direct link: ../../../docs/media/demo.mp4

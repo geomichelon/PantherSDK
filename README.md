@@ -21,13 +21,13 @@ What’s Included (PoC summary)
 - Samples for iOS (Swift), Android (Kotlin), Flutter (Dart FFI) e React Native (Android/iOS)
 
 Demo Video
-- Place your demo at `docs/media/demo.mov` and GitHub will render it inline below.
+- Place your demo at `docs/media/demo.mp4` (under 100 MB) and GitHub will render it inline below.
 
-<video src="docs/media/demo.mov" width="720" controls muted playsinline>
+<video src="docs/media/demo.mp4" width="720" controls muted playsinline>
   Your browser does not support the video tag. See the link below.
 </video>
 
-- Direct link: docs/media/demo.mov
+- Direct link: docs/media/demo.mp4
 
 iOS Sample — Tabs Overview
 - LLMs

@@ -8,7 +8,7 @@ struct ValidationRow: Identifiable {
     let tokensIn: Int
     let tokensOut: Int
     let costUSD: Double
-    let response: String
+    var response: String
     // Extras for strategies/metrics (optional in UI)
     let strategy: String?
     let coherence: Double?

@@ -20,6 +20,15 @@ What’s Included (PoC summary)
 - Bias and content metrics (BLEU, ROUGE‑L, accuracy, fluency, diversity, plagiarism)
 - Samples for iOS (Swift), Android (Kotlin), Flutter (Dart FFI) e React Native (Android/iOS)
 
+Demo Video
+- Place your demo at `docs/media/demo.mov` and GitHub will render it inline below.
+
+<video src="docs/media/demo.mov" width="720" controls muted playsinline>
+  Your browser does not support the video tag. See the link below.
+</video>
+
+- Direct link: docs/media/demo.mov
+
 iOS Sample — Tabs Overview
 - LLMs
   - Selecione e configure os LLMs (OpenAI/Ollama/Anthropic) usados na validação (Single).

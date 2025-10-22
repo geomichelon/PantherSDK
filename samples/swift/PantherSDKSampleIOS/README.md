@@ -9,7 +9,7 @@ Scores & Compliance
 - Adherence score (per‑provider): 0–100% based on presence of expected_terms from the active guideline in the response. 100% = all terms present; 0% = none or error.
 - Trust Index (run‑level): mean adherence of successful rows × safety‑coverage ratio over the combined text (consultation, risks/contraindications, lowest effective dose, prenatal vitamins/folic acid, vaccinations: flu shot/Tdap, labeling: FDA/PLLR). Result ∈ [0,1].
   - Multi‑LLM note: coverage is computed on the merged text of successful rows (can be high with more rows), while the mean adherence may decrease if several rows are mid/low — e.g., coverage ≈ 0.83 and Trust ≈ 0.30.
-  - Single‑LLM rule: with only one valid result, Trust equals adherence (coverage factor not applied).
+  - Single‑LLM rule: if the run returns a single result (one provider), Trust equals adherence (coverage factor not applied).
 
 Guidelines
 - Built‑in default: ANVISA example (see `crates/panther-validation/guidelines/anvisa.json`).
@@ -53,3 +53,12 @@ Monitoring — Prometheus Pushgateway
 Notes
 - Costs shown are estimates using the editable price table (per 1k tokens).
 - Local methods protect privacy (no network calls). Embeddings require credentials.
+
+Demo Video
+- If you place a demo video at the repo path `docs/media/demo.mp4`, GitHub will render it in the root README. You can also view it from this README via the relative link below:
+
+<video src="../../../docs/media/demo.mov" width="720" controls muted playsinline>
+  Your browser does not support the video tag. See the link below.
+</video>
+
+- Direct link: ../../../docs/media/demo.mov

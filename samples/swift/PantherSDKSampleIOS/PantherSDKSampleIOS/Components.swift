@@ -42,7 +42,7 @@ struct SummaryView: View {
 }
 
 struct ResultCard: View {
-    let row: ValidationRow
+    @Binding var row: ValidationRow
     @State private var expanded = false
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -76,8 +76,7 @@ struct ResultCard: View {
                     .accessibilityLabel("Copy response")
             }
             if expanded {
-                Text(row.response)
-                    .textSelection(.enabled)
+                TextEditor(text: $row.response)
                     .font(.system(.footnote, design: .monospaced))
                     .padding(8)
                     .background(Color(UIColor.tertiarySystemBackground))

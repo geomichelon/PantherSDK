@@ -75,21 +75,6 @@ class MainActivity : AppCompatActivity() {
         }
         val guidelineStatus = TextView(this)
         val btnSaveGuidelines = Button(this).apply { text = "Save Guidelines" }
-        val btnGuidelinesScores = Button(this).apply { text = "Guidelines Scores (Hybrid)" }
-        // Index persistence controls
-        val idxNameInput = EditText(this).apply { hint = "Index name"; setText("default") }
-        val btnIndexSave = Button(this).apply { text = "Save Index" }
-        val btnIndexLoad = Button(this).apply { text = "Load Index" }
-
-        // Cost rules editor
-        val costRulesTitle = TextView(this).apply { text = "Cost Rules (JSON)"; textSize = 16f }
-        val costRulesInput = EditText(this).apply {
-            hint = "Cost rules as JSON array"
-            setLines(6); isSingleLine = false
-            setText(prefs.getString("cost.rules", PantherSDK.defaultCostRulesJson) ?: PantherSDK.defaultCostRulesJson)
-        }
-        val btnRestoreCost = Button(this).apply { text = "Restore Default" }
-        val btnSaveCost = Button(this).apply { text = "Save Cost Rules" }
 
         // Cost rules editor
         val costRulesTitle = TextView(this).apply { text = "Cost Rules (JSON)"; textSize = 16f }
@@ -118,20 +103,6 @@ class MainActivity : AppCompatActivity() {
         val outputView = TextView(this)
 
         var currentPreset = presets.first()
-        // Load provider session
-        run {
-            val t = prefs.getString("prov.type", null)
-            val b = prefs.getString("prov.base", null)
-            val m = prefs.getString("prov.model", null)
-            val k = prefs.getString("prov.key", null)
-            if (t != null) {
-                val idx = presets.indexOfFirst { it.label.equals(t, ignoreCase = true) || it.type.equals(t, ignoreCase = true) }
-                if (idx >= 0) currentPreset = presets[idx]
-            }
-            if (b != null) baseInput.setText(b)
-            if (m != null) modelInput.setText(m)
-            if (k != null) apiKeyInput.setText(k)
-        }
         applyPreset(currentPreset, baseInput, modelInput, apiKeyInput)
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -174,51 +145,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-<<<<<<< HEAD
-        btnIndexSave.setOnClickListener {
-            val name = idxNameInput.text.toString().trim().ifEmpty { "default" }
-            val json = guidelineInput.text.toString().trim()
-            if (json.isEmpty()) { guidelineStatus.text = "Provide guidelines JSON"; guidelineStatus.visibility = View.VISIBLE; return@setOnClickListener }
-            val rc = PantherBridge.guidelinesSave(name, json)
-            guidelineStatus.text = if (rc == 0) "Index saved: $name" else "Save failed"
-            guidelineStatus.visibility = View.VISIBLE
-        }
-        btnIndexLoad.setOnClickListener {
-            val name = idxNameInput.text.toString().trim().ifEmpty { "default" }
-            val n = PantherBridge.guidelinesLoad(name)
-            guidelineStatus.text = if (n > 0) "Index loaded: $name ($n items)" else "Load failed or empty"
-            guidelineStatus.visibility = View.VISIBLE
-        }
-
-        btnGuidelinesScores.setOnClickListener {
-            val json = guidelineInput.text.toString().trim()
-            val q = prompt.text.toString().trim()
-            if (json.isEmpty() || q.isEmpty()) { outputView.text = "Enter guidelines JSON and prompt"; return@setOnClickListener }
-            try {
-                val n = PantherBridge.guidelinesIngest(json)
-                if (n <= 0) { outputView.text = "No guidelines ingested"; return@setOnClickListener }
-                val out = PantherBridge.guidelinesScores(q, 5, "hybrid")
-                // Parse JSON and format with bow/jaccard details
-                val arr = org.json.JSONArray(out)
-                val lines = mutableListOf<String>()
-                for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
-                    val topic = o.optString("topic", "?")
-                    val score = o.optDouble("score", 0.0)
-                    val bow = o.optDouble("bow", Double.NaN)
-                    val jac = o.optDouble("jaccard", Double.NaN)
-                    val bowStr = if (bow.isNaN()) "" else String.format("bow %.3f", bow)
-                    val jacStr = if (jac.isNaN()) "" else String.format(", jac %.3f", jac)
-                    lines.add("$topic – ${"%.3f".format(score)} ($bowStr$jacStr)")
-                }
-                outputView.text = lines.joinToString("\n")
-            } catch (e: Exception) {
-                outputView.text = e.message
-            }
-        }
-
-=======
->>>>>>> origin/main
         btnRestoreCost.setOnClickListener {
             costRulesInput.setText(PantherSDK.defaultCostRulesJson)
         }
@@ -238,22 +164,6 @@ class MainActivity : AppCompatActivity() {
             addView(modelPresetRowOpenAI)
             addView(modelPresetRowOllama)
             addView(apiKeyInput)
-<<<<<<< HEAD
-            // Save provider session
-            addView(Button(this@MainActivity).apply {
-                text = "Save Provider Session"
-                setOnClickListener {
-                    prefs.edit()
-                        .putString("prov.type", currentPreset.label)
-                        .putString("prov.base", baseInput.text.toString().trim())
-                        .putString("prov.model", modelInput.text.toString().trim())
-                        .putString("prov.key", apiKeyInput.text.toString().trim())
-                        .apply()
-                    Toast.makeText(this@MainActivity, "Provider session saved", Toast.LENGTH_SHORT).show()
-                }
-            })
-=======
->>>>>>> origin/main
             addView(TextView(this@MainActivity).apply { text = "Mode" })
             addView(modeSpinner)
             addView(includeOllamaCheck)
@@ -262,14 +172,6 @@ class MainActivity : AppCompatActivity() {
             addView(guidelineToggle)
             addView(guidelineInput)
             addView(btnSaveGuidelines)
-            addView(btnGuidelinesScores)
-            // Index persistence
-            addView(idxNameInput)
-            val idxRow = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL }
-            idxRow.addView(btnIndexSave)
-            val spaceIdx = Space(this@MainActivity); spaceIdx.minimumWidth = 24; idxRow.addView(spaceIdx)
-            idxRow.addView(btnIndexLoad)
-            addView(idxRow)
             addView(guidelineStatus)
             // Cost rules (JSON) editor
             addView(costRulesTitle)

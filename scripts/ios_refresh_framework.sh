@@ -6,11 +6,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Features used by the sample (override by exporting FEATURES="...")
-<<<<<<< HEAD
-: "${FEATURES:=metrics-inmemory storage-inmemory validation validation-openai validation-ollama guidelines-embed-openai guidelines-embed-ollama}"
-=======
 : "${FEATURES:=metrics-inmemory storage-inmemory validation validation-openai validation-ollama}"
->>>>>>> origin/main
 
 # Ensure release script is executable and build the xcframework into dist/<version>/ios
 chmod +x "$ROOT_DIR/scripts/release/build_ios_xcframework.sh" "$ROOT_DIR/scripts/release/_common.sh" 2>/dev/null || true
@@ -38,7 +34,4 @@ rsync -a "$SRC/" "$DST/"
 
 echo "Refreshed: $DST"
 find "$DST" -maxdepth 2 -print
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main

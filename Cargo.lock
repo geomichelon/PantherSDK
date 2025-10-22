@@ -2151,7 +2151,6 @@ dependencies = [
  "panther-storage-sled",
  "panther-validation",
  "panthersdk",
- "reqwest 0.11.27",
  "serde",
  "serde_json",
  "tokio",

@@ -32,33 +32,6 @@ pub struct LLMValidator {
 }
 
 impl LLMValidator {
-    /// Select expected terms from the top-K guideline topics that are most related to the prompt
-    /// using a simple token-overlap heuristic. Falls back to all terms if K == 0 or no guidelines.
-    fn expected_terms_for_prompt(&self, input_prompt: &str, k: usize) -> Vec<String> {
-        if self.guidelines.is_empty() { return Vec::new(); }
-        if k == 0 { // union of all
-            return self
-                .guidelines
-                .iter()
-                .flat_map(|g| g.expected_terms.iter().cloned())
-                .collect();
-        }
-        let pset = tokenize_set(input_prompt);
-        let mut scored: Vec<(usize, &Guideline)> = self
-            .guidelines
-            .iter()
-            .map(|g| {
-                let mut s = tokenize_set(&g.topic);
-                for t in &g.expected_terms { s.extend(tokenize_set(t)); }
-                let overlap = pset.intersection(&s).count();
-                (overlap, g)
-            })
-            .collect();
-        // sort descending by overlap
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
-        let selected = scored.into_iter().take(k).map(|(_, g)| g);
-        selected.flat_map(|g| g.expected_terms.iter().cloned()).collect()
-    }
     pub fn from_path<P: AsRef<Path>>(path: P, providers: Vec<(String, Arc<dyn LlmProvider>)>) -> Result<Self> {
         let text = fs::read_to_string(path)?;
         let guidelines: Vec<Guideline> = serde_json::from_str(&text)?;
@@ -71,9 +44,11 @@ impl LLMValidator {
     }
 
     pub async fn validate(&self, input_prompt: &str) -> Result<Vec<ValidationResult>> {
-        // Use top-K guideline topics (default K=3) to build the expected term set.
-        // This reduces false negatives when a large guideline set is present.
-        let expected: Vec<String> = self.expected_terms_for_prompt(input_prompt, 3);
+        let expected: Vec<String> = self
+            .guidelines
+            .iter()
+            .flat_map(|g| g.expected_terms.iter().cloned())
+            .collect();
 
         let mut tasks: Vec<tokio::task::JoinHandle<VRes>> = Vec::new();
         for (label, prov) in &self.providers {
@@ -130,17 +105,6 @@ impl LLMValidator {
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64
-}
-
-fn tokenize_set(s: &str) -> std::collections::HashSet<String> {
-    use std::collections::HashSet;
-    let mut set = HashSet::new();
-    let lower = s.to_lowercase();
-    for tok in lower.split(|c: char| !c.is_alphanumeric()) {
-        let t = tok.trim();
-        if !t.is_empty() { set.insert(t.to_string()); }
-    }
-    set
 }
 
 fn score_text(text: &str, expected_terms: &[String]) -> (f64, Vec<String>) {

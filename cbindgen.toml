@@ -23,11 +23,6 @@ include = [
   "panther_metrics_coherence",
   "panther_metrics_diversity",
   "panther_metrics_fluency",
-  "panther_metrics_rouge_l",
-  "panther_metrics_fact_coverage",
-  "panther_metrics_factcheck_adv",
-  "panther_metrics_plagiarism",
-  "panther_metrics_plagiarism_ngram",
   "panther_metrics_record",
   "panther_bias_detect",
   "panther_storage_save_metric",
@@ -36,9 +31,6 @@ include = [
   "panther_storage_list_metrics",
   "panther_logs_get",
   "panther_logs_get_recent",
-  "panther_token_count",
-  "panther_calculate_cost",
-  "panther_get_token_metrics",
   "panther_validation_run_default",
   "panther_validation_run_openai",
   "panther_validation_run_ollama",
@@ -50,12 +42,4 @@ include = [
   "panther_proof_verify_local",
   "panther_proof_anchor_eth",
   "panther_proof_check_eth",
-<<<<<<< HEAD
-  "panther_guidelines_ingest_json",
-  "panther_guidelines_similarity",
-  "panther_guidelines_save_json",
-  "panther_guidelines_load",
-  "panther_guidelines_embeddings_build",
-=======
->>>>>>> origin/main
 ]

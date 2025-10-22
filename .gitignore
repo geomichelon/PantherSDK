@@ -52,8 +52,3 @@ yarn-error.log
 # Generated headers (keep placeholder tracked)
 # If you want to ignore all generated headers, comment out the next line
 #!bindings/include/panther.h
-# Ignore large media videos (prevent >100MB pushes)
-docs/media/*.mov
-docs/media/*.MOV
-docs/media/*.mp4
-docs/media/*.MP4

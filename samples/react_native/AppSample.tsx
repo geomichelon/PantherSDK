@@ -9,20 +9,20 @@ try {
 } catch (_) {
   RNEventSource = null;
 }
-import {init, validate, validateMulti, validateMultiWithProof, validateCustom, validateCustomWithProof, validateOpenAI, validateOllama, anchorProof, startAgent, pollAgent, evaluatePlagiarism, analyzeBias, tokenCount, calculateCost, guidelinesIngest, guidelinesScores} from './Panther';
+import {init, validate, validateMulti, validateMultiWithProof, validateCustom, validateCustomWithProof, validateOpenAI, validateOllama, anchorProof, startAgent, pollAgent, evaluatePlagiarism, analyzeBias, tokenCount, calculateCost} from './Panther';
 // Optional persistence for cost rules
 let AsyncStorage: any = null;
 try { AsyncStorage = require('@react-native-async-storage/async-storage').default || require('@react-native-async-storage/async-storage'); } catch (_) { AsyncStorage = null; }
 
 const defaultCostRules = `[
-  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.00015, "usd_per_1k_out": 0.00060},
-  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.00030, "usd_per_1k_out": 0.00120},
-  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},
-  {"match": "openai:gpt-4o",       "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},
-  {"match": "openai:chatgpt-5",    "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},
-  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00},
-  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00},
-  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00}
+  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.15, "usd_per_1k_out": 0.60},
+  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.30, "usd_per_1k_out": 1.20},
+  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},
+  {"match": "openai:gpt-4o",       "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},
+  {"match": "openai:chatgpt-5",    "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},
+  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},
+  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},
+  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00}
 ]`;
 const openAIModels = ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-4o', 'chatgpt-5'];
 const ollamaModels = ['llama3', 'phi3', 'mistral'];
@@ -81,8 +81,6 @@ export default function AppSample() {
   const [useCustomGuidelines, setUseCustomGuidelines] = useState<boolean>(false);
   const [guidelinesJson, setGuidelinesJson] = useState<string>('');
   const [guidelinesURL, setGuidelinesURL] = useState<string>('');
-  const [simLines, setSimLines] = useState<string[]>([]);
-  const [indexName, setIndexName] = useState<string>('default');
   const [lastResults, setLastResults] = useState<any[]>([]);
 
   useEffect(() => {
@@ -93,36 +91,10 @@ export default function AppSample() {
         if (AsyncStorage) {
           const s = await AsyncStorage.getItem('panther.cost_rules');
           if (s && s.trim().length) setCostRules(s);
-          // Load provider session (if any)
-          const ptype = await AsyncStorage.getItem('prov.type');
-          if (ptype) setProvider(ptype as any);
-          const oBase = await AsyncStorage.getItem('prov.openai.base'); if (oBase) setOpenAIBase(oBase);
-          const oModel = await AsyncStorage.getItem('prov.openai.model'); if (oModel) setOpenAIModel(oModel);
-          const oKey = await AsyncStorage.getItem('prov.openai.key'); if (oKey) setApiKeyOpenAI(oKey);
-          const olBase = await AsyncStorage.getItem('prov.ollama.base'); if (olBase) setOllamaBase(olBase);
-          const olModel = await AsyncStorage.getItem('prov.ollama.model'); if (olModel) setOllamaModel(olModel);
-          const aBase = await AsyncStorage.getItem('prov.anth.base'); if (aBase) setAnthropicBase(aBase);
-          const aModel = await AsyncStorage.getItem('prov.anth.model'); if (aModel) setAnthropicModel(aModel);
-          const aKey = await AsyncStorage.getItem('prov.anth.key'); if (aKey) setApiKeyAnthropic(aKey);
         }
       } catch (_) {}
     })();
   }, []);
-
-  const saveProviderSession = async () => {
-    try {
-      if (!AsyncStorage) return;
-      await AsyncStorage.setItem('prov.type', provider);
-      await AsyncStorage.setItem('prov.openai.base', openAIBase);
-      await AsyncStorage.setItem('prov.openai.model', openAIModel);
-      await AsyncStorage.setItem('prov.openai.key', apiKeyOpenAI);
-      await AsyncStorage.setItem('prov.ollama.base', ollamaBase);
-      await AsyncStorage.setItem('prov.ollama.model', ollamaModel);
-      await AsyncStorage.setItem('prov.anth.base', anthropicBase);
-      await AsyncStorage.setItem('prov.anth.model', anthropicModel);
-      await AsyncStorage.setItem('prov.anth.key', apiKeyAnthropic);
-    } catch {}
-  };
 
   const runValidation = async () => {
     setTxHash(null);
@@ -173,26 +145,6 @@ export default function AppSample() {
     } catch (e: any) {
       setLines([String(e?.message || e)]);
       setProof(null);
-    }
-  };
-
-  const runGuidelinesScores = async () => {
-    try {
-      setSimLines([]);
-      const url = guidelinesURL.trim();
-      let json = guidelinesJson.trim();
-      if (!json && url) {
-        const resp = await fetch(url);
-        json = await resp.text();
-      }
-      if (!json) { setSimLines(['Provide guidelines JSON or URL']); return; }
-      const n = await guidelinesIngest(json);
-      if (n <= 0) { setSimLines(['No guidelines ingested']); return; }
-      const out = await guidelinesScores(prompt, 5, 'hybrid');
-      const arr = JSON.parse(out) as Array<{topic: string; score: number; bow?: number; jaccard?: number}>;
-      setSimLines(arr.map(r => `${r.topic} – ${r.score.toFixed(3)} (bow ${(r.bow ?? 0).toFixed(3)}, jac ${(r.jaccard ?? 0).toFixed(3)})`));
-    } catch (e: any) {
-      setSimLines([String(e?.message || e)]);
     }
   };
 
@@ -400,10 +352,6 @@ export default function AppSample() {
         <Text style={{color:'#666'}}>Usando providers de ambiente (Default)</Text>
       )}
 
-      <View style={styles.row}>
-        <Button title="Salvar sessão" onPress={saveProviderSession} />
-      </View>
-
       <Text style={styles.h2}>Providers JSON</Text>
       <TextInput
         style={[styles.input, styles.multiline]}
@@ -437,37 +385,7 @@ export default function AppSample() {
             <Button title="Carregar" onPress={async () => {
               try { const r = await fetch(guidelinesURL); const s = await r.text(); setGuidelinesJson(s); } catch {}
             }} />
-            <View style={{width:8}} />
-            <Button title="Fetch + scores" onPress={runGuidelinesScores} />
           </View>
-          <View style={[styles.row, {marginTop: 6}] }>
-            <TextInput style={[styles.input, {flex: 1}]} value={indexName} onChangeText={setIndexName} placeholder="index name" />
-            <View style={{width:8}} />
-            <Button title="Salvar índice" onPress={async () => {
-              try {
-                const name = (indexName || 'default').trim();
-                const json = guidelinesJson.trim();
-                if (!json) return;
-                const {guidelinesSave} = await import('./Panther');
-                const rc = await guidelinesSave(name, json);
-                setSimLines([rc === 0 ? `Index saved: ${name}` : 'Save failed']);
-              } catch (e: any) { setSimLines([String(e?.message || e)]); }
-            }} />
-            <View style={{width:8}} />
-            <Button title="Carregar índice" onPress={async () => {
-              try {
-                const name = (indexName || 'default').trim();
-                const {guidelinesLoad} = await import('./Panther');
-                const n = await guidelinesLoad(name);
-                setSimLines([n > 0 ? `Index loaded: ${name} (${n})` : 'Load failed or empty']);
-              } catch (e: any) { setSimLines([String(e?.message || e)]); }
-            }} />
-          </View>
-          {simLines.length ? (
-            <View style={{marginTop: 8}}>
-              {simLines.map((l, i) => (<Text key={`sim-${i}`}>{l}</Text>))}
-            </View>
-          ) : null}
         </>
       ) : (
         <Text style={{color:'#666'}}>ANVISA (padrão embutido)</Text>

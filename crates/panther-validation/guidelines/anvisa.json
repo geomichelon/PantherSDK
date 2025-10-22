@@ -1,22 +1,16 @@
 [
   {
-    "topic": "Use of medications during pregnancy (safe use principles)",
+    "topic": "Uso de medicamentos na gravidez",
     "expected_terms": [
-      "consult healthcare provider",
-      "over-the-counter",
-      "supplements",
-      "herbal remedies",
-      "FDA pregnancy categories",
-      "lowest effective dose",
-      "avoid isotretinoin",
-      "avoid tetracycline",
-      "ibuprofen in the third trimester",
-      "prenatal vitamins",
-      "folic acid",
-      "side effects",
-      "vaccinations",
-      "flu shot",
-      "Tdap"
+      "consulta médica",
+      "contraindicado",
+      "categoria de risco",
+      "dosagem",
+      "efeitos colaterais",
+      "advertência",
+      "ANVISA",
+      "orientação profissional"
     ]
   }
 ]
+

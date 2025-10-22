@@ -8,16 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() => runApp(const MyApp());
 
 const defaultCostRulesJson = '[\n'
-<<<<<<< HEAD
-    '  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.00015, "usd_per_1k_out": 0.00060},\n'
-    '  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.00030, "usd_per_1k_out": 0.00120},\n'
-    '  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},\n'
-    '  {"match": "openai:gpt-4o",       "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},\n'
-    '  {"match": "openai:chatgpt-5",    "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},\n'
-    '  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00},\n'
-    '  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00},\n'
-    '  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00}\n'
-=======
     '  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.15, "usd_per_1k_out": 0.60},\n'
     '  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.30, "usd_per_1k_out": 1.20},\n'
     '  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
@@ -26,7 +16,6 @@ const defaultCostRulesJson = '[\n'
     '  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},\n'
     '  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},\n'
     '  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00}\n'
->>>>>>> origin/main
     ']';
 const openAIModels = [
   'gpt-4o-mini',
@@ -86,10 +75,6 @@ class _MyAppState extends State<MyApp> {
   late TextEditingController ollamaModelController;
   late TextEditingController guidelinesController;
   late TextEditingController guidelinesUrlController;
-<<<<<<< HEAD
-  List<String> simLines = [];
-=======
->>>>>>> origin/main
   double? plagScore;
   double? trustIndex;
   double? biasScore;
@@ -120,28 +105,11 @@ class _MyAppState extends State<MyApp> {
     ollamaModelController = TextEditingController(text: 'llama3');
     guidelinesController = TextEditingController();
     guidelinesUrlController = TextEditingController();
-<<<<<<< HEAD
-    indexNameController = TextEditingController(text: 'default');
-=======
->>>>>>> origin/main
     SharedPreferences.getInstance().then((prefs) {
       final s = prefs.getString('panther.cost_rules');
       if (s != null && s.trim().isNotEmpty) {
         setState(() { costRulesController.text = s; });
       }
-<<<<<<< HEAD
-      // Load provider session
-      final p = prefs.getString('prov.type');
-      if (p != null && p.trim().isNotEmpty) {
-        setState(() { selectedPreset = p; });
-      }
-      final oBase = prefs.getString('prov.openai.base'); if (oBase != null) setState(() { openAIBaseController.text = oBase; });
-      final oModel = prefs.getString('prov.openai.model'); if (oModel != null) setState(() { openAIModelController.text = oModel; });
-      final oKey = prefs.getString('prov.openai.key'); if (oKey != null) setState(() { openAIKeyController.text = oKey; });
-      final olBase = prefs.getString('prov.ollama.base'); if (olBase != null) setState(() { ollamaBaseController.text = olBase; });
-      final olModel = prefs.getString('prov.ollama.model'); if (olModel != null) setState(() { ollamaModelController.text = olModel; });
-=======
->>>>>>> origin/main
     });
   }
 
@@ -166,10 +134,6 @@ class _MyAppState extends State<MyApp> {
     ollamaModelController.dispose();
     guidelinesController.dispose();
     guidelinesUrlController.dispose();
-<<<<<<< HEAD
-    indexNameController.dispose();
-=======
->>>>>>> origin/main
     super.dispose();
   }
 
@@ -399,53 +363,7 @@ class _MyAppState extends State<MyApp> {
                     final body = await resp.transform(const Utf8Decoder()).join();
                     setState(() { guidelinesController.text = body; });
                   } catch (_) {}
-<<<<<<< HEAD
-                }, child: const Text('Load')),
-                const SizedBox(width: 8),
-                ElevatedButton(onPressed: () {
-                  final json = guidelinesController.text.trim(); final q = promptController.text.trim();
-                  if (json.isEmpty || q.isEmpty) { setState(() { simLines = ['Provide guidelines JSON and prompt']; }); return; }
-                  final n = panther.guidelinesIngest(json);
-                  if (n <= 0) { setState(() { simLines = ['No items ingested']; }); return; }
-          final out = panther.guidelinesScores(q, 5, 'hybrid');
-          try {
-            final arr = jsonDecode(out) as List<dynamic>;
-            setState(() {
-              simLines = arr.map((e) {
-                final t = e['topic']?.toString() ?? '?';
-                final s = (e['score'] ?? 0).toDouble();
-                final bow = (e['bow'] ?? 0).toDouble();
-                final jac = (e['jaccard'] ?? 0).toDouble();
-                return '$t – ${s.toStringAsFixed(3)} (bow ${bow.toStringAsFixed(3)}, jac ${jac.toStringAsFixed(3)})';
-              }).cast<String>().toList();
-            });
-          } catch (_) { setState(() { simLines = [out]; }); }
-        }, child: const Text('Fetch + scores'))
-              ]),
-              if (simLines.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: simLines.map((l) => Text(l)).toList()),
-              ],
-              const SizedBox(height: 6),
-              Row(children:[
-                Expanded(child: TextField(controller: indexNameController, decoration: const InputDecoration(hintText: 'index name', border: OutlineInputBorder()))),
-                const SizedBox(width: 8),
-                ElevatedButton(onPressed: () {
-                  final name = (indexNameController.text.trim().isEmpty ? 'default' : indexNameController.text.trim());
-                  final json = guidelinesController.text.trim();
-                  if (json.isEmpty) { setState(() { simLines = ['Provide guidelines JSON']; }); return; }
-                  final rc = panther.guidelinesSave(name, json);
-                  setState(() { simLines = [rc == 0 ? 'Index saved: '+name : 'Save failed']; });
-                }, child: const Text('Save Index')),
-                const SizedBox(width: 8),
-                ElevatedButton(onPressed: () {
-                  final name = (indexNameController.text.trim().isEmpty ? 'default' : indexNameController.text.trim());
-                  final n = panther.guidelinesLoad(name);
-                  setState(() { simLines = [n > 0 ? 'Index loaded: '+name+' ('+n.toString()+')' : 'Load failed or empty']; });
-                }, child: const Text('Load Index')),
-=======
                 }, child: const Text('Load'))
->>>>>>> origin/main
               ]),
               const SizedBox(height: 12),
               DropdownButton<String>(
@@ -479,18 +397,6 @@ class _MyAppState extends State<MyApp> {
                   obscureText: true,
                 ),
               ],
-              const SizedBox(height: 8),
-              Row(children:[
-                ElevatedButton(onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('prov.type', selectedPreset);
-                  await prefs.setString('prov.openai.base', openAIBaseController.text.trim());
-                  await prefs.setString('prov.openai.model', openAIModelController.text.trim());
-                  await prefs.setString('prov.openai.key', openAIKeyController.text.trim());
-                  await prefs.setString('prov.ollama.base', ollamaBaseController.text.trim());
-                  await prefs.setString('prov.ollama.model', ollamaModelController.text.trim());
-                }, child: const Text('Save Provider Session'))
-              ]),
               const SizedBox(height: 8),
               SwitchListTile(
                 title: const Text('Include local Ollama'),

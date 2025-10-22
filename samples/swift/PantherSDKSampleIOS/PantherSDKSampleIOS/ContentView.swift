@@ -41,6 +41,9 @@ struct ContentView: View {
     // Compliance & Proof extras
     @State private var complianceReport: String = ""
     @State private var trustIndex: Double = 0
+    // Optional Prometheus Pushgateway export
+    @State private var pushMetricsEnabled: Bool = false
+    @State private var pushGatewayURL: String = "http://127.0.0.1:9091"
     @State private var guidelinesURL: String = ""
     @State private var proofApiBase: String = "http://127.0.0.1:8000"
     @State private var lastAnchorResponse: String = ""
@@ -160,6 +163,17 @@ struct ContentView: View {
                     if !results.isEmpty {
                         SectionHeader("Compliance Report")
                         HStack { Button("Generate Compliance") { generateCompliance() }.buttonStyle(.borderedProminent).buttonBorderShape(.capsule); Spacer() }
+                        // Optional Prometheus Pushgateway
+                        Toggle("Push metrics to Prometheus (Pushgateway)", isOn: $pushMetricsEnabled)
+                        if pushMetricsEnabled {
+                            HStack {
+                                TextField("http://127.0.0.1:9091", text: $pushGatewayURL)
+                                    .textFieldStyle(.roundedBorder)
+                                Button("Push now") { pushMetrics() }
+                                    .buttonStyle(.borderedProminent).buttonBorderShape(.capsule)
+                            }
+                            Text("Sends trust_index, coverage_ratio and per-provider metrics to Pushgateway (job: panther, instance: ios)").font(.caption).foregroundColor(.secondary)
+                        }
                         if !complianceReport.isEmpty {
                             Text("Trust Index: \(String(format: "%.1f", trustIndex*100))%")
                                 .font(.subheadline)
@@ -426,9 +440,15 @@ struct ContentView: View {
         let total = coverage.count
         let coverageRatio = total > 0 ? Double(present) / Double(total) : 0.0
 
-        // Trust Index: average adherence scaled by safety coverage ratio (0..1)
+        // Trust Index: with a single valid row, match adherence; otherwise scale by coverage (conservative)
         let avgAdh = ok.map{ $0.score/100.0 }.reduce(0,+) / Double(ok.count)
-        trustIndex = max(0, min(1, avgAdh * coverageRatio))
+        if ok.count == 1 {
+            trustIndex = max(0, min(1, avgAdh))
+        } else {
+            trustIndex = max(0, min(1, avgAdh * coverageRatio))
+        }
+
+        if pushMetricsEnabled { pushMetrics(coverageRatio: coverageRatio) }
 
         // Build a compact JSON report: coverage booleans + ratio + missing categories
         let missing = coverage.filter { !$0.value }.map { $0.key }
@@ -443,6 +463,42 @@ struct ContentView: View {
         } else {
             complianceReport = "{}"
         }
+    }
+
+    private func pushMetrics(coverageRatio: Double? = nil) {
+        guard pushMetricsEnabled, let url = URL(string: pushGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        // Build Prometheus exposition format
+        var lines: [String] = []
+        // run-level
+        lines.append(String(format: "panther_trust_index %.6f", trustIndex))
+        if let cov = coverageRatio ?? extractCoverageRatio() {
+            lines.append(String(format: "panther_coverage_ratio %.6f", cov))
+        }
+        // per-provider
+        for r in results where r.score > 0 {
+            let prov = r.provider.replacingOccurrences(of: "\"", with: "'")
+            lines.append(String(format: "panther_adherence_score{provider=\"%@\"} %.6f", prov, r.score/100.0))
+            lines.append(String(format: "panther_latency_ms{provider=\"%@\"} %d", prov, r.latencyMs))
+            lines.append(String(format: "panther_cost_usd{provider=\"%@\"} %.6f", prov, r.costUSD))
+        }
+        let body = lines.joined(separator: "\n") + "\n"
+        // Pushgateway path: /metrics/job/<job>/instance/<instance>
+        var pushURL = url
+        if pushURL.path.isEmpty || pushURL.path == "/" {
+            pushURL.append(path: "/metrics/job/panther/instance/ios")
+        }
+        var req = URLRequest(url: pushURL)
+        req.httpMethod = "POST"
+        req.setValue("text/plain; version=0.0.4", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body.data(using: .utf8)
+        URLSession.shared.dataTask(with: req) { _, _, _ in }.resume()
+    }
+
+    private func extractCoverageRatio() -> Double? {
+        guard let data = complianceReport.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let cov = obj["coverage_ratio"] as? Double else { return nil }
+        return cov
     }
 
     private func loadGuidelinesFromURL() {

@@ -19,11 +19,14 @@ typedef _c_calculate_cost = ffi.Double Function(ffi.Int32, ffi.Int32, ffi.Pointe
 typedef _c_validate_openai = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
 typedef _c_validate_ollama = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
 typedef _c_validate_custom = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
+<<<<<<< HEAD
 typedef _c_guidelines_ingest = ffi.Int32 Function(ffi.Pointer<ffi.Char>);
 typedef _c_guidelines_similarity = ffi.Pointer<ffi.Char> Function(ffi.Pointer<ffi.Char>, ffi.Int32, ffi.Pointer<ffi.Char>);
 typedef _c_guidelines_save = ffi.Int32 Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>);
 typedef _c_guidelines_load = ffi.Int32 Function(ffi.Pointer<ffi.Char>);
 typedef _c_guidelines_embed_build = ffi.Int32 Function(ffi.Pointer<ffi.Char>);
+=======
+>>>>>>> origin/main
 
 class PantherFFI {
   late final ffi.DynamicLibrary _lib;
@@ -44,11 +47,14 @@ class PantherFFI {
   late final _c_validate_openai _validateOpenAI;
   late final _c_validate_ollama _validateOllama;
   late final _c_validate_custom _validateCustom;
+<<<<<<< HEAD
   late final _c_guidelines_ingest _guidelinesIngest;
   late final _c_guidelines_similarity _guidelinesSimilarity;
   late final _c_guidelines_save _guidelinesSave;
   late final _c_guidelines_load _guidelinesLoad;
   late final _c_guidelines_embed_build _guidelinesBuildEmbeddings;
+=======
+>>>>>>> origin/main
 
   PantherFFI() {
     if (Platform.isAndroid) {
@@ -78,11 +84,14 @@ class PantherFFI {
     _validateOpenAI = _lib.lookupFunction<_c_validate_openai, _c_validate_openai>('panther_validation_run_openai');
     _validateOllama = _lib.lookupFunction<_c_validate_ollama, _c_validate_ollama>('panther_validation_run_ollama');
     _validateCustom = _lib.lookupFunction<_c_validate_custom, _c_validate_custom>('panther_validation_run_custom');
+<<<<<<< HEAD
     _guidelinesIngest = _lib.lookupFunction<_c_guidelines_ingest, _c_guidelines_ingest>('panther_guidelines_ingest_json');
     _guidelinesSimilarity = _lib.lookupFunction<_c_guidelines_similarity, _c_guidelines_similarity>('panther_guidelines_similarity');
     _guidelinesSave = _lib.lookupFunction<_c_guidelines_save, _c_guidelines_save>('panther_guidelines_save_json');
     _guidelinesLoad = _lib.lookupFunction<_c_guidelines_load, _c_guidelines_load>('panther_guidelines_load');
     _guidelinesBuildEmbeddings = _lib.lookupFunction<_c_guidelines_embed_build, _c_guidelines_embed_build>('panther_guidelines_embeddings_build');
+=======
+>>>>>>> origin/main
   }
 
   int init() => _init();
@@ -234,6 +243,7 @@ class PantherFFI {
     _free(ptr);
     return result;
   }
+<<<<<<< HEAD
 
   // --- Guidelines ---
   int guidelinesIngest(String json) {
@@ -270,4 +280,6 @@ class PantherFFI {
     pkg_ffi.malloc.free(m);
     return rc;
   }
+=======
+>>>>>>> origin/main
 }

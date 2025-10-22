@@ -33,12 +33,15 @@ public class PantherModule extends ReactContextBaseJavaModule {
     private static native String validateCustom(String prompt, String providersJson, String guidelinesJson);
     private static native int tokenCount(String text);
     private static native double calculateCost(int tokensIn, int tokensOut, String providerName, String costRulesJson);
+<<<<<<< HEAD
     // Guidelines
     private static native int pantherGuidelinesIngest(String json);
     private static native String pantherGuidelinesScores(String query, int topK, String method);
     private static native int pantherGuidelinesSave(String name, String json);
     private static native int pantherGuidelinesLoad(String name);
     private static native int pantherGuidelinesEmbeddingsBuild(String method);
+=======
+>>>>>>> origin/main
 
     @ReactMethod
     public void init(Promise promise) {
@@ -121,6 +124,7 @@ public class PantherModule extends ReactContextBaseJavaModule {
     public void calculateCost(int tokensIn, int tokensOut, String providerName, String costRulesJson, Promise promise) {
         promise.resolve(calculateCost(tokensIn, tokensOut, providerName, costRulesJson));
     }
+<<<<<<< HEAD
 
     // --- Guidelines ---
     @ReactMethod
@@ -140,4 +144,6 @@ public class PantherModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void guidelinesBuildEmbeddings(String method, Promise promise) { promise.resolve(pantherGuidelinesEmbeddingsBuild(method)); }
+=======
+>>>>>>> origin/main
 }

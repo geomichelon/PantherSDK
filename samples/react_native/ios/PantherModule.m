@@ -18,12 +18,15 @@
  - (void)version:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)tokenCount:(NSString *)text resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)calculateCost:(nonnull NSNumber *)tokensIn tokensOut:(nonnull NSNumber *)tokensOut providerName:(NSString *)providerName costRulesJson:(NSString *)costRulesJson resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+<<<<<<< HEAD
  // Guidelines
  - (void)guidelinesIngest:(NSString *)json resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)guidelinesScores:(NSString *)query topK:(nonnull NSNumber *)topK method:(NSString *)method resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)guidelinesSave:(NSString *)name json:(NSString *)json resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)guidelinesLoad:(NSString *)name resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
  - (void)guidelinesBuildEmbeddings:(NSString *)method resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject;
+=======
+>>>>>>> origin/main
 @end
 
 @implementation PantherModule
@@ -232,6 +235,7 @@ RCT_REMAP_METHOD(version,
   resolve(res);
 }
 
+<<<<<<< HEAD
 // --- Guidelines ---
 RCT_REMAP_METHOD(guidelinesIngest,
                  guidelinesIngestWithJson:(NSString *)json
@@ -279,4 +283,6 @@ RCT_REMAP_METHOD(guidelinesBuildEmbeddings,
   resolve(@(n));
 }
 
+=======
+>>>>>>> origin/main
 @end

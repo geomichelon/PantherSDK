@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() => runApp(const MyApp());
 
 const defaultCostRulesJson = '[\n'
+<<<<<<< HEAD
     '  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.00015, "usd_per_1k_out": 0.00060},\n'
     '  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.00030, "usd_per_1k_out": 0.00120},\n'
     '  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},\n'
@@ -16,6 +17,16 @@ const defaultCostRulesJson = '[\n'
     '  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00},\n'
     '  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00},\n'
     '  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00}\n'
+=======
+    '  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.15, "usd_per_1k_out": 0.60},\n'
+    '  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.30, "usd_per_1k_out": 1.20},\n'
+    '  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
+    '  {"match": "openai:gpt-4o",       "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
+    '  {"match": "openai:chatgpt-5",    "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
+    '  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},\n'
+    '  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},\n'
+    '  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00}\n'
+>>>>>>> origin/main
     ']';
 const openAIModels = [
   'gpt-4o-mini',
@@ -75,7 +86,10 @@ class _MyAppState extends State<MyApp> {
   late TextEditingController ollamaModelController;
   late TextEditingController guidelinesController;
   late TextEditingController guidelinesUrlController;
+<<<<<<< HEAD
   List<String> simLines = [];
+=======
+>>>>>>> origin/main
   double? plagScore;
   double? trustIndex;
   double? biasScore;
@@ -106,12 +120,16 @@ class _MyAppState extends State<MyApp> {
     ollamaModelController = TextEditingController(text: 'llama3');
     guidelinesController = TextEditingController();
     guidelinesUrlController = TextEditingController();
+<<<<<<< HEAD
     indexNameController = TextEditingController(text: 'default');
+=======
+>>>>>>> origin/main
     SharedPreferences.getInstance().then((prefs) {
       final s = prefs.getString('panther.cost_rules');
       if (s != null && s.trim().isNotEmpty) {
         setState(() { costRulesController.text = s; });
       }
+<<<<<<< HEAD
       // Load provider session
       final p = prefs.getString('prov.type');
       if (p != null && p.trim().isNotEmpty) {
@@ -122,6 +140,8 @@ class _MyAppState extends State<MyApp> {
       final oKey = prefs.getString('prov.openai.key'); if (oKey != null) setState(() { openAIKeyController.text = oKey; });
       final olBase = prefs.getString('prov.ollama.base'); if (olBase != null) setState(() { ollamaBaseController.text = olBase; });
       final olModel = prefs.getString('prov.ollama.model'); if (olModel != null) setState(() { ollamaModelController.text = olModel; });
+=======
+>>>>>>> origin/main
     });
   }
 
@@ -146,7 +166,10 @@ class _MyAppState extends State<MyApp> {
     ollamaModelController.dispose();
     guidelinesController.dispose();
     guidelinesUrlController.dispose();
+<<<<<<< HEAD
     indexNameController.dispose();
+=======
+>>>>>>> origin/main
     super.dispose();
   }
 
@@ -376,6 +399,7 @@ class _MyAppState extends State<MyApp> {
                     final body = await resp.transform(const Utf8Decoder()).join();
                     setState(() { guidelinesController.text = body; });
                   } catch (_) {}
+<<<<<<< HEAD
                 }, child: const Text('Load')),
                 const SizedBox(width: 8),
                 ElevatedButton(onPressed: () {
@@ -419,6 +443,9 @@ class _MyAppState extends State<MyApp> {
                   final n = panther.guidelinesLoad(name);
                   setState(() { simLines = [n > 0 ? 'Index loaded: '+name+' ('+n.toString()+')' : 'Load failed or empty']; });
                 }, child: const Text('Load Index')),
+=======
+                }, child: const Text('Load'))
+>>>>>>> origin/main
               ]),
               const SizedBox(height: 12),
               DropdownButton<String>(

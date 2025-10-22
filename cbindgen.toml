@@ -50,9 +50,12 @@ include = [
   "panther_proof_verify_local",
   "panther_proof_anchor_eth",
   "panther_proof_check_eth",
+<<<<<<< HEAD
   "panther_guidelines_ingest_json",
   "panther_guidelines_similarity",
   "panther_guidelines_save_json",
   "panther_guidelines_load",
   "panther_guidelines_embeddings_build",
+=======
+>>>>>>> origin/main
 ]

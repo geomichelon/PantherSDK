@@ -17,12 +17,15 @@ type PantherModuleType = {
   validateCustom(prompt: string, providersJson: string, guidelinesJson: string): Promise<string>;
   tokenCount(text: string): Promise<number>;
   calculateCost(tokensIn: number, tokensOut: number, providerName: string, costRulesJson: string): Promise<number>;
+<<<<<<< HEAD
   // Guidelines
   guidelinesIngest(json: string): Promise<number>;
   guidelinesScores(query: string, topK: number, method: string): Promise<string>;
   guidelinesSave(name: string, json: string): Promise<number>;
   guidelinesLoad(name: string): Promise<number>;
   guidelinesBuildEmbeddings(method: string): Promise<number>;
+=======
+>>>>>>> origin/main
 };
 
 const {PantherModule} = NativeModules as {PantherModule: PantherModuleType};
@@ -91,6 +94,7 @@ export async function calculateCost(tokensIn: number, tokensOut: number, provide
   return PantherModule.calculateCost(tokensIn, tokensOut, providerName, costRulesJson);
 }
 
+<<<<<<< HEAD
 // --- Guidelines ---
 export async function guidelinesIngest(json: string): Promise<number> {
   return PantherModule.guidelinesIngest(json);
@@ -108,6 +112,8 @@ export async function guidelinesBuildEmbeddings(method: string): Promise<number>
   return PantherModule.guidelinesBuildEmbeddings(method);
 }
 
+=======
+>>>>>>> origin/main
 export async function anchorProof(hash: string, apiBase?: string, apiKey?: string): Promise<{tx_hash?: string; error?: string}> {
   const base = apiBase ?? (Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
   const res = await fetch(`${base}/proof/anchor`, {

@@ -42,6 +42,7 @@ enum PantherBridge {
         return json.withCString { j in strPtr(panther_bias_detect(j)) }
     }
 
+<<<<<<< HEAD
     // MARK: - Content Metrics (BLEU/Coherence/Fluency)
     static func coherence(_ text: String) -> Double { text.withCString { t in panther_metrics_coherence(t) } }
     static func fluency(_ text: String) -> Double { text.withCString { t in panther_metrics_fluency(t) } }
@@ -70,12 +71,17 @@ enum PantherBridge {
             return URL(string: s)
         }
         guard let u = mapSpecial(url) else { completion(nil); return }
+=======
+    static func loadGuidelinesFromURL(_ url: String, completion: @escaping (String?) -> Void) {
+        guard let u = URL(string: url) else { completion(nil); return }
+>>>>>>> origin/main
         URLSession.shared.dataTask(with: u) { data, _, _ in
             guard let data = data, let s = String(data: data, encoding: .utf8) else { completion(nil); return }
             completion(s)
         }.resume()
     }
 
+<<<<<<< HEAD
     // MARK: - Guidelines Similarity
     static func guidelinesIngest(json: String) -> Int {
         json.withCString { j in Int(panther_guidelines_ingest_json(j)) }
@@ -93,6 +99,8 @@ enum PantherBridge {
         method.withCString { m in Int(panther_guidelines_embeddings_build(m)) }
     }
 
+=======
+>>>>>>> origin/main
     static func anchorProof(apiBase: String, hash: String, completion: @escaping (String) -> Void) {
         guard let base = URL(string: apiBase) else { return }
         var req = URLRequest(url: base.appendingPathComponent("proof/anchor"))
@@ -152,6 +160,7 @@ private func panther_validation_run_custom_with_proof(_ prompt: UnsafePointer<CC
 @_silgen_name("panther_bias_detect")
 private func panther_bias_detect(_ samplesJson: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
 
+<<<<<<< HEAD
 @_silgen_name("panther_metrics_coherence")
 private func panther_metrics_coherence(_ text: UnsafePointer<CChar>) -> Double
 @_silgen_name("panther_metrics_fluency")
@@ -167,3 +176,5 @@ private func panther_guidelines_save_json(_ name: UnsafePointer<CChar>, _ json: 
 private func panther_guidelines_load(_ name: UnsafePointer<CChar>) -> Int32
 @_silgen_name("panther_guidelines_embeddings_build")
 private func panther_guidelines_embeddings_build(_ method: UnsafePointer<CChar>) -> Int32
+=======
+>>>>>>> origin/main

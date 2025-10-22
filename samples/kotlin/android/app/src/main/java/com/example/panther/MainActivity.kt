@@ -91,6 +91,16 @@ class MainActivity : AppCompatActivity() {
         val btnRestoreCost = Button(this).apply { text = "Restore Default" }
         val btnSaveCost = Button(this).apply { text = "Save Cost Rules" }
 
+        // Cost rules editor
+        val costRulesTitle = TextView(this).apply { text = "Cost Rules (JSON)"; textSize = 16f }
+        val costRulesInput = EditText(this).apply {
+            hint = "Cost rules as JSON array"
+            setLines(6); isSingleLine = false
+            setText(prefs.getString("cost.rules", PantherSDK.defaultCostRulesJson) ?: PantherSDK.defaultCostRulesJson)
+        }
+        val btnRestoreCost = Button(this).apply { text = "Restore Default" }
+        val btnSaveCost = Button(this).apply { text = "Save Cost Rules" }
+
         val btnValidate = Button(this).apply { text = "Validate" }
         // Mode selector: Single / Multi / With Proof
         val modeSpinner = Spinner(this)
@@ -164,6 +174,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+<<<<<<< HEAD
         btnIndexSave.setOnClickListener {
             val name = idxNameInput.text.toString().trim().ifEmpty { "default" }
             val json = guidelineInput.text.toString().trim()
@@ -206,6 +217,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+=======
+>>>>>>> origin/main
         btnRestoreCost.setOnClickListener {
             costRulesInput.setText(PantherSDK.defaultCostRulesJson)
         }
@@ -225,6 +238,7 @@ class MainActivity : AppCompatActivity() {
             addView(modelPresetRowOpenAI)
             addView(modelPresetRowOllama)
             addView(apiKeyInput)
+<<<<<<< HEAD
             // Save provider session
             addView(Button(this@MainActivity).apply {
                 text = "Save Provider Session"
@@ -238,6 +252,8 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Provider session saved", Toast.LENGTH_SHORT).show()
                 }
             })
+=======
+>>>>>>> origin/main
             addView(TextView(this@MainActivity).apply { text = "Mode" })
             addView(modeSpinner)
             addView(includeOllamaCheck)

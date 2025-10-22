@@ -214,6 +214,7 @@ Java_com_example_panther_PantherBridge_calculateCost(JNIEnv* env, jclass clazz, 
     (*env)->ReleaseStringUTFChars(env, costRulesJson, r);
     return cost;
 }
+<<<<<<< HEAD
 
 // --- Guidelines similarity JNI wrappers ---
 JNIEXPORT jint JNICALL
@@ -266,3 +267,5 @@ Java_com_example_panther_PantherBridge_guidelinesBuildEmbeddings(JNIEnv* env, jc
     (*env)->ReleaseStringUTFChars(env, method, m);
     return (jint)rc;
 }
+=======
+>>>>>>> origin/main

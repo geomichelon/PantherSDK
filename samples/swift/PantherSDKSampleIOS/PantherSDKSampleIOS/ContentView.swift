@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     enum Mode: String, CaseIterable { case single = "Single", multi = "Multi", proof = "With Proof" }
     enum Provider: String, CaseIterable { case openai = "OpenAI", ollama = "Ollama", anthropic = "Anthropic", `default` = "Default" }
+<<<<<<< HEAD
     enum Strategy: String, CaseIterable { case baseline = "Baseline", structured = "Structured", comprehensive = "Full (JSON)", all = "Run All (3)" }
     @EnvironmentObject private var session: AppSession
 
@@ -10,6 +11,12 @@ struct ContentView: View {
     @State private var mode: Mode = .single
     @State private var provider: Provider = .openai
     @State private var strategy: Strategy = .baseline
+=======
+
+    @State private var prompt: String = "Explique recomendações seguras de medicamentos na gravidez."
+    @State private var mode: Mode = .single
+    @State private var provider: Provider = .openai
+>>>>>>> origin/main
 
     @State private var apiKey: String = ""
     @State private var openAIBase: String = "https://api.openai.com"
@@ -24,12 +31,15 @@ struct ContentView: View {
 
     @State private var useCustomGuidelines: Bool = false
     @State private var customGuidelines: String = ""
+<<<<<<< HEAD
     @FocusState private var guidelinesFocused: Bool
     private var isGuidelinesJSONValid: Bool {
         let s = customGuidelines.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty, let data = s.data(using: .utf8) else { return false }
         return (try? JSONSerialization.jsonObject(with: data)) != nil
     }
+=======
+>>>>>>> origin/main
 
     @State private var showCostRules: Bool = false
     @State private var costRulesJson: String = CostRules.defaultJSON
@@ -41,6 +51,7 @@ struct ContentView: View {
     // Compliance & Proof extras
     @State private var complianceReport: String = ""
     @State private var trustIndex: Double = 0
+<<<<<<< HEAD
     @State private var trustIndexText: String = ""
     // Optional Prometheus Pushgateway export
     @State private var pushMetricsEnabled: Bool = false
@@ -54,6 +65,11 @@ struct ContentView: View {
     @State private var indexName: String = "default"
     @State private var simNotice: String = ""
     @State private var showHelp: Bool = false
+=======
+    @State private var guidelinesURL: String = ""
+    @State private var proofApiBase: String = "http://127.0.0.1:8000"
+    @State private var lastAnchorResponse: String = ""
+>>>>>>> origin/main
 
     var body: some View {
         NavigationView {
@@ -66,11 +82,16 @@ struct ContentView: View {
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(8)
 
+<<<<<<< HEAD
                     SectionHeader("Execution")
+=======
+                    SectionHeader("Execução")
+>>>>>>> origin/main
                     Picker("Mode", selection: $mode) {
                         ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
+<<<<<<< HEAD
                     Picker("Prompt Strategy", selection: $strategy) {
                         ForEach(Strategy.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
@@ -82,11 +103,51 @@ struct ContentView: View {
                     if useCustomGuidelines {
                         TextEditor(text: $customGuidelines)
                             .focused($guidelinesFocused)
+=======
+                    Picker("Provider", selection: $provider) {
+                        ForEach(Provider.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Group {
+                        if provider == .openai {
+                            TextField("OpenAI API Key", text: $apiKey)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("Base URL", text: $openAIBase)
+                                .textFieldStyle(.roundedBorder)
+                            ModelPicker(title: "Model", presets: CostRules.openAIModels, selection: $openAIModel)
+                        } else if provider == .ollama {
+                            TextField("Ollama Base (http://127.0.0.1:11434)", text: $ollamaBase)
+                                .textFieldStyle(.roundedBorder)
+                            ModelPicker(title: "Model", presets: CostRules.ollamaModels, selection: $ollamaModel)
+                        } else if provider == .anthropic {
+                            TextField("Anthropic API Key", text: $anthropicKey)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("Base URL (https://api.anthropic.com)", text: $anthropicBase)
+                                .textFieldStyle(.roundedBorder)
+                            ModelPicker(title: "Model", presets: CostRules.anthropicModels, selection: $anthropicModel)
+                        } else {
+                            Text("Usando providers de ambiente (Default)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    SectionHeader("Diretrizes")
+                    Toggle("Usar diretrizes customizadas (JSON)", isOn: $useCustomGuidelines)
+                    if useCustomGuidelines {
+                        TextEditor(text: $customGuidelines)
+>>>>>>> origin/main
                             .frame(minHeight: 90)
                             .padding(8)
                             .background(Color(.secondarySystemBackground))
                             .cornerRadius(8)
                             .font(.caption)
+<<<<<<< HEAD
                         let trimmed = customGuidelines.trimmingCharacters(in: .whitespacesAndNewlines)
                         if trimmed.isEmpty {
                             Text("Empty JSON — using ANVISA (fallback)")
@@ -103,20 +164,32 @@ struct ContentView: View {
                         }
                     } else {
                         Text("ANVISA (built-in default)")
+=======
+                    } else {
+                        Text("ANVISA (padrão embutido)")
+>>>>>>> origin/main
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
 
                     HStack {
+<<<<<<< HEAD
                         SectionHeader("Costs (estimate)")
                         Spacer()
                         Button("Edit Table") { showCostRules = true }
                             .buttonStyle(.borderedProminent)
                             .buttonBorderShape(.capsule)
+=======
+                        SectionHeader("Custos (estimativa)")
+                        Spacer()
+                        Button("Editar Tabela") { showCostRules = true }
+                            .buttonStyle(.bordered)
+>>>>>>> origin/main
                     }
 
                     Button(action: runValidation) {
                         HStack { isRunning ? AnyView(AnyView(ProgressView())) : AnyView(Image(systemName: "checkmark.shield")); Text("Validate") }
+<<<<<<< HEAD
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -131,6 +204,21 @@ struct ContentView: View {
 
                     if let proof = proofJSON, mode == .proof {
                         SectionHeader("Proof")
+=======
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isRunning || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    if !results.isEmpty {
+                        SectionHeader("Resultados")
+                        SummaryView(rows: results)
+                        ForEach(results) { row in ResultCard(row: row) }
+                    }
+
+                    if let proof = proofJSON, mode == .proof {
+                        SectionHeader("Prova")
+>>>>>>> origin/main
                         Text(proof)
                             .font(.system(.footnote, design: .monospaced))
                             .padding(8)
@@ -142,12 +230,17 @@ struct ContentView: View {
                             Text("Anchor proof (Python API)").font(.subheadline).fontWeight(.semibold)
                             TextField("API Base (ex.: http://127.0.0.1:8000)", text: $proofApiBase).textFieldStyle(.roundedBorder)
                             HStack {
+<<<<<<< HEAD
                                 Button("Anchor") { anchorProof() }
                                     .buttonStyle(.borderedProminent)
                                     .buttonBorderShape(.capsule)
                                 Button("Status") { checkProofStatus() }
                                     .buttonStyle(.borderedProminent)
                                     .buttonBorderShape(.capsule)
+=======
+                                Button("Anchor") { anchorProof() }.buttonStyle(.borderedProminent)
+                                Button("Status") { checkProofStatus() }
+>>>>>>> origin/main
                             }
                             if !lastAnchorResponse.isEmpty {
                                 Text(lastAnchorResponse)
@@ -163,6 +256,7 @@ struct ContentView: View {
                     // Compliance: bias/trust index
                     if !results.isEmpty {
                         SectionHeader("Compliance Report")
+<<<<<<< HEAD
                         HStack { Button("Generate Compliance") { generateCompliance() }.buttonStyle(.borderedProminent).buttonBorderShape(.capsule); Spacer() }
                         // Optional Prometheus Pushgateway
                         Toggle("Push metrics to Prometheus (Pushgateway)", isOn: $pushMetricsEnabled)
@@ -189,6 +283,15 @@ struct ContentView: View {
                             TextEditor(text: $complianceReport)
                                 .font(.system(.footnote, design: .monospaced))
                                 .frame(minHeight: 120)
+=======
+                        HStack { Button("Gerar Compliance") { generateCompliance() }; Spacer() }
+                        if !complianceReport.isEmpty {
+                            Text("Trust Index: \(String(format: "%.1f", trustIndex*100))%")
+                                .font(.subheadline)
+                                .foregroundColor(trustIndex >= 0.8 ? .green : (trustIndex >= 0.6 ? .orange : .red))
+                            Text(complianceReport)
+                                .font(.system(.footnote, design: .monospaced))
+>>>>>>> origin/main
                                 .padding(8)
                                 .background(Color(.secondarySystemBackground))
                                 .cornerRadius(8)
@@ -196,6 +299,7 @@ struct ContentView: View {
                     }
 
                     // Load Guidelines from URL helper
+<<<<<<< HEAD
                     SectionHeader("Load Guidelines by URL")
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("https://…/guidelines.json", text: $guidelinesURL)
@@ -246,10 +350,18 @@ struct ContentView: View {
                         if !simNotice.isEmpty {
                             Text(simNotice).font(.caption).foregroundColor(.secondary)
                         }
+=======
+                    SectionHeader("Carregar Diretrizes por URL")
+                    HStack {
+                        TextField("https://…/guidelines.json", text: $guidelinesURL)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Carregar") { loadGuidelinesFromURL() }
+>>>>>>> origin/main
                     }
                 }
                 .padding()
             }
+<<<<<<< HEAD
             .simultaneousGesture(TapGesture().onEnded { guidelinesFocused = false })
             .hideKeyboardOnTap()
             .navigationTitle("Validate")
@@ -290,6 +402,28 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showCostRules) {
             NavigationView { CostRulesInlineEditor(costRulesJson: $costRulesJson) }
+=======
+            .navigationTitle("PantherSDK")
+        }
+        .sheet(isPresented: $showCostRules) {
+            NavigationView {
+                VStack(alignment: .leading) {
+                    TextEditor(text: $costRulesJson)
+                        .font(.system(.footnote, design: .monospaced))
+                        .padding(8)
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(8)
+                    HStack {
+                        Button("Restaurar Padrão") { costRulesJson = CostRules.defaultJSON }
+                        Spacer()
+                        Button("Fechar") { showCostRules = false }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding()
+                .navigationTitle("Tabela de Custos")
+            }
+>>>>>>> origin/main
         }
     }
 
@@ -298,6 +432,7 @@ struct ContentView: View {
         results = []
         proofJSON = nil
         DispatchQueue.global(qos: .userInitiated).async {
+<<<<<<< HEAD
             func transformed(_ s: Strategy, _ p: String) -> (name: String, text: String) {
                 switch s {
                 case .baseline: return ("Baseline", p)
@@ -361,6 +496,30 @@ struct ContentView: View {
             DispatchQueue.main.async {
                 isRunning = false
                 results = sorted
+=======
+            let output: String
+            switch mode {
+            case .single:
+                switch provider {
+                case .openai: output = callOpenAI(prompt: prompt, apiKey: apiKey, model: openAIModel, base: openAIBase)
+                case .ollama: output = callOllama(prompt: prompt, base: ollamaBase, model: ollamaModel)
+                case .anthropic:
+                    // Use multi path with single entry
+                    let arr: [[String: String]] = [["type": "anthropic", "api_key": anthropicKey, "model": anthropicModel, "base_url": anthropicBase]]
+                    let data = try? JSONSerialization.data(withJSONObject: arr)
+                    let singleJSON = String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
+                    output = callMulti(prompt: prompt, providersJSON: singleJSON, withProof: false)
+                case .default: output = callDefault(prompt: prompt)
+                }
+            case .multi:
+                output = callMulti(prompt: prompt, providersJSON: buildProvidersJSON(), withProof: false)
+            case .proof:
+                output = callMulti(prompt: prompt, providersJSON: buildProvidersJSON(), withProof: true)
+            }
+            DispatchQueue.main.async {
+                isRunning = false
+                parseAndDisplay(output)
+>>>>>>> origin/main
             }
         }
     }
@@ -377,16 +536,25 @@ struct ContentView: View {
         case .default:
             break
         }
+<<<<<<< HEAD
+=======
+        arr.append(["type": "default", "model": "anvisa", "base_url": ""]) // comparação
+>>>>>>> origin/main
         let data = try? JSONSerialization.data(withJSONObject: arr)
         return String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
     }
 
+<<<<<<< HEAD
     private func rowsFromOutput(_ s: String, strategy: String?) -> [ValidationRow] {
+=======
+    private func parseAndDisplay(_ s: String) {
+>>>>>>> origin/main
         if mode == .proof, let data = s.data(using: .utf8),
            let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
            let arr = obj["results"], let arrData = try? JSONSerialization.data(withJSONObject: arr),
            let json = try? JSONSerialization.jsonObject(with: arrData) as? [[String: Any]] {
             self.proofJSON = pretty(obj)
+<<<<<<< HEAD
             return rows(from: json, strategy: strategy)
         }
         if let data = s.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
@@ -396,6 +564,17 @@ struct ContentView: View {
     }
 
     private func rows(from arr: [[String: Any]], strategy: String?) -> [ValidationRow] {
+=======
+            self.results = rows(from: json)
+            return
+        }
+        if let data = s.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            self.results = rows(from: json)
+        }
+    }
+
+    private func rows(from arr: [[String: Any]]) -> [ValidationRow] {
+>>>>>>> origin/main
         let tokensIn = PantherBridge.tokenCount(prompt)
         let rules = costRulesJson
         return arr.compactMap { r -> ValidationRow? in
@@ -405,10 +584,15 @@ struct ContentView: View {
             let text = r["raw_text"] as? String ?? ""
             let tokensOut = PantherBridge.tokenCount(text)
             let cost = PantherBridge.calculateCost(tokensIn: tokensIn, tokensOut: tokensOut, provider: name, rules: rules)
+<<<<<<< HEAD
             let coh = PantherBridge.coherence(text)
             let flu = PantherBridge.fluency(text)
             return ValidationRow(provider: name, score: score, latencyMs: lat, tokensIn: tokensIn, tokensOut: tokensOut, costUSD: cost, response: text, strategy: strategy, coherence: coh, fluency: flu)
         }
+=======
+            return ValidationRow(provider: name, score: score, latencyMs: lat, tokensIn: tokensIn, tokensOut: tokensOut, costUSD: cost, response: text)
+        }.sorted { $0.score > $1.score }
+>>>>>>> origin/main
     }
 
     private func pretty(_ obj: Any) -> String {
@@ -436,6 +620,7 @@ struct ContentView: View {
 
     // MARK: - Compliance helpers
     private func generateCompliance() {
+<<<<<<< HEAD
         // Consider only successful rows (score > 0) to avoid upstream error rows skewing trust
         let ok = results.filter { $0.score > 0 }
         guard !ok.isEmpty else {
@@ -522,6 +707,21 @@ struct ContentView: View {
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let cov = obj["coverage_ratio"] as? Double else { return nil }
         return cov
+=======
+        // bias over all responses
+        let samples = results.map { $0.response }
+        let s = PantherBridge.biasDetect(samples: samples)
+        complianceReport = s
+        // simple trust index heuristic: avg adherence penalized by bias
+        let avgAdh = results.map{ $0.score/100.0 }.reduce(0,+) / Double(results.count)
+        if let d = s.data(using: .utf8),
+           let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+           let bias = o["bias_score"] as? Double {
+            trustIndex = max(0, min(1, avgAdh * (1.0 - bias)))
+        } else {
+            trustIndex = avgAdh
+        }
+>>>>>>> origin/main
     }
 
     private func loadGuidelinesFromURL() {
@@ -534,6 +734,7 @@ struct ContentView: View {
         }
     }
 
+<<<<<<< HEAD
     private func fetchAndScore() {
         PantherBridge.loadGuidelinesFromURL(guidelinesURL) { s in
             guard let s = s else { return }
@@ -579,6 +780,8 @@ struct ContentView: View {
         if n > 0 { fetchAndScore() }
     }
 
+=======
+>>>>>>> origin/main
     private func extractCombinedHash() -> String? {
         guard let proof = proofJSON, let data = proof.data(using: .utf8) else { return nil }
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {

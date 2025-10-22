@@ -39,12 +39,19 @@ fi
 OUT_DIR="$DIST_DIR/ios"
 mkdir -p "$OUT_DIR"
 
+<<<<<<< HEAD
 # Ensure we start from a clean xcframework dir to avoid partial overwrites
 rm -rf "$OUT_DIR/PantherSDK.xcframework"
 
+=======
+>>>>>>> origin/main
 xcodebuild -create-xcframework \
   -library "$IOS_LIB_SIM" -headers "$INCLUDE_DIR" \
   -library "$IOS_LIB_DEVICE" -headers "$INCLUDE_DIR" \
   -output "$OUT_DIR/PantherSDK.xcframework"
 
 echo "Created: $OUT_DIR/PantherSDK.xcframework"
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main

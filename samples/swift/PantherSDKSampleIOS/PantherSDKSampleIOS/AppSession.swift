@@ -65,6 +65,21 @@ final class AppSession: ObservableObject {
         // no-op: multi UI removed
     }
 
+    func reset() {
+        let k = K.self
+        [k.provider, k.openAIBase, k.openAIModel, k.openAIKey,
+         k.ollamaBase, k.ollamaModel,
+         k.anthropicBase, k.anthropicModel, k.anthropicKey,
+         k.useAdv, k.advJson].forEach { d.removeObject(forKey: $0) }
+        // Restore in-memory defaults
+        provider = .openai
+        openAIBase = "https://api.openai.com"; openAIModel = "gpt-4o-mini"; openAIKey = ""
+        ollamaBase = "http://127.0.0.1:11434"; ollamaModel = "llama3"
+        anthropicBase = "https://api.anthropic.com"; anthropicModel = "claude-3-5-sonnet-latest"; anthropicKey = ""
+        useAdvancedProvidersJSON = false; advancedProvidersJSON = ""
+        save()
+    }
+
     func providersJSON(includeDefault: Bool = false) -> String {
         // If user enabled the advanced JSON and it's valid JSON array, return it
         if useAdvancedProvidersJSON {

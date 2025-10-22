@@ -10,6 +10,7 @@ Estados
 
 Cross‑cutting
 - [x] Guidelines Similarity FFI (ingest JSON; BOW/Jaccard/Hybrid)
+- [x] Documentar no Help/README que BOW/Jaccard/Hybrid são locais/offline; Embeddings requerem endpoints
 - [x] Embeddings (OpenAI/Ollama) para Similarity via FFI
 - [x] Persistência de diretrizes (save/load via KV)
 - [ ] ANN opcional para embeddings (HNSW/IVF) + cache de índices

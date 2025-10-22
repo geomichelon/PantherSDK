@@ -1,0 +1,162 @@
+[
+  {
+    "topic": "Specificity/Selectivity",
+    "expected_terms": [
+      "specificity",
+      "selectivity",
+      "interference",
+      "placebo",
+      "matrix",
+      "degradation products",
+      "co-eluting",
+      "peak purity",
+      "blank response",
+      "chromatogram"
+    ]
+  },
+  {
+    "topic": "Linearity",
+    "expected_terms": [
+      "calibration curve",
+      "linearity",
+      "correlation coefficient",
+      "r2",
+      "slope",
+      "intercept",
+      "residuals",
+      "regression",
+      "ANOVA",
+      "linearity range"
+    ]
+  },
+  {
+    "topic": "Accuracy/Recovery",
+    "expected_terms": [
+      "accuracy",
+      "recovery",
+      "% recovery",
+      "spiked samples",
+      "reference standard",
+      "bias",
+      "trueness",
+      "fortification",
+      "mean recovery",
+      "acceptance criteria"
+    ]
+  },
+  {
+    "topic": "Precision (Repeatability)",
+    "expected_terms": [
+      "precision",
+      "repeatability",
+      "intra-day",
+      "RSD",
+      "CV",
+      "replicates",
+      "n=6"
+    ]
+  },
+  {
+    "topic": "Intermediate Precision",
+    "expected_terms": [
+      "intermediate precision",
+      "between-day",
+      "analyst-to-analyst",
+      "equipment",
+      "laboratory conditions",
+      "reproducibility",
+      "RSD"
+    ]
+  },
+  {
+    "topic": "Range",
+    "expected_terms": [
+      "range",
+      "working range",
+      "lower limit",
+      "upper limit",
+      "linearity",
+      "accuracy",
+      "precision",
+      "LOD",
+      "LOQ"
+    ]
+  },
+  {
+    "topic": "LOD (Limit of Detection)",
+    "expected_terms": [
+      "limit of detection",
+      "LOD",
+      "signal-to-noise",
+      "S/N 3",
+      "3.3*σ/S",
+      "blank standard deviation",
+      "sensitivity",
+      "detection limit"
+    ]
+  },
+  {
+    "topic": "LOQ (Limit of Quantitation)",
+    "expected_terms": [
+      "limit of quantitation",
+      "LOQ",
+      "signal-to-noise",
+      "S/N 10",
+      "10*σ/S",
+      "%RSD at LOQ",
+      "quantitation limit"
+    ]
+  },
+  {
+    "topic": "Robustness/Ruggedness",
+    "expected_terms": [
+      "robustness",
+      "ruggedness",
+      "deliberate variations",
+      "flow rate",
+      "pH",
+      "column temperature",
+      "mobile phase composition",
+      "impact",
+      "system suitability"
+    ]
+  },
+  {
+    "topic": "System Suitability",
+    "expected_terms": [
+      "system suitability",
+      "tailing factor",
+      "theoretical plates",
+      "resolution",
+      "retention time",
+      "RSD of injections",
+      "USP <621>",
+      "k'"
+    ]
+  },
+  {
+    "topic": "Solution/Sample Stability",
+    "expected_terms": [
+      "solution stability",
+      "sample stability",
+      "autosampler",
+      "bench-top",
+      "freeze-thaw",
+      "storage conditions",
+      "% difference",
+      "stability"
+    ]
+  },
+  {
+    "topic": "Acceptance Criteria (General)",
+    "expected_terms": [
+      "acceptance criteria",
+      "%RSD <= 2%",
+      "recovery 98-102%",
+      "r2 >= 0.99",
+      "resolution >= 2",
+      "tailing factor <= 2"
+    ]
+  }
+]
+

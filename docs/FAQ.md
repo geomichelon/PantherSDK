@@ -32,7 +32,7 @@ PantherSDK — FAQ (Perguntas Frequentes)
 
 7) Como estimar custo e tokens?
 - FFI: `panther_token_count(text)` (tokenizador simples por espaço) e `panther_calculate_cost(tokens_in, tokens_out, provider_name, rules_json)`.
-- O JSON de “rules” pode ser uma lista de objetos `{match|provider, usd_per_1k_in, usd_per_1k_out}`. O `match` aceita prefixos (ex.: `openai:gpt-4o`).
+- O JSON de “rules” pode ser uma lista de objetos `{match|provider, usd_per_1k_in, usd_per_1k_out}`. Também é aceito `{usd_per_1m_in, usd_per_1m_out}` (valores por 1 milhão de tokens) — o FFI converte para base de 1k automaticamente. O `match` aceita prefixos (ex.: `openai:gpt-4o`).
 
 8) Métricas de conteúdo e viés
 - Métricas como BLEU, ROUGE‑L, fluência, diversidade e plágio (baseline) via `panther_metrics_*`.
@@ -78,4 +78,3 @@ nm -gU samples/swift/frameworkIOS/PantherSDKIOS.xcframework/ios-arm64-simulator/
 
 15) Segurança e chaves
 - Use variáveis de ambiente para chaves. Não comite chaves em código/fonte.
-

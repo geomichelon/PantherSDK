@@ -3,11 +3,13 @@ import SwiftUI
 struct ContentView: View {
     enum Mode: String, CaseIterable { case single = "Single", multi = "Multi", proof = "With Proof" }
     enum Provider: String, CaseIterable { case openai = "OpenAI", ollama = "Ollama", anthropic = "Anthropic", `default` = "Default" }
+    enum Strategy: String, CaseIterable { case baseline = "Baseline", structured = "Structured", comprehensive = "Full (JSON)", all = "Run All (3)" }
     @EnvironmentObject private var session: AppSession
 
-    @State private var prompt: String = "Explique recomendações seguras de medicamentos na gravidez."
+    @State private var prompt: String = "Explain safe medication recommendations during pregnancy."
     @State private var mode: Mode = .single
     @State private var provider: Provider = .openai
+    @State private var strategy: Strategy = .baseline
 
     @State private var apiKey: String = ""
     @State private var openAIBase: String = "https://api.openai.com"
@@ -60,15 +62,19 @@ struct ContentView: View {
                         .background(Color(.secondarySystemBackground))
                         .cornerRadius(8)
 
-                    SectionHeader("Execução")
+                    SectionHeader("Execution")
                     Picker("Mode", selection: $mode) {
                         ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
+                    Picker("Prompt Strategy", selection: $strategy) {
+                        ForEach(Strategy.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
                     // Provider configuration moved to Providers tab (session-backed)
 
-                    SectionHeader("Diretrizes")
-                    Toggle("Usar diretrizes customizadas (JSON)", isOn: $useCustomGuidelines)
+                    SectionHeader("Guidelines")
+                    Toggle("Use custom guidelines (JSON)", isOn: $useCustomGuidelines)
                     if useCustomGuidelines {
                         TextEditor(text: $customGuidelines)
                             .focused($guidelinesFocused)
@@ -79,46 +85,48 @@ struct ContentView: View {
                             .font(.caption)
                         let trimmed = customGuidelines.trimmingCharacters(in: .whitespacesAndNewlines)
                         if trimmed.isEmpty {
-                            Text("JSON vazio — usando ANVISA (fallback)")
+                            Text("Empty JSON — using ANVISA (fallback)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         } else if !isGuidelinesJSONValid {
-                            Text("JSON inválido — não é JSON válido")
+                            Text("Invalid JSON — not valid JSON")
                                 .font(.caption)
                                 .foregroundColor(.red)
                         } else {
-                            Text("JSON válido")
+                            Text("Valid JSON")
                                 .font(.caption)
                                 .foregroundColor(.green)
                         }
                     } else {
-                        Text("ANVISA (padrão embutido)")
+                        Text("ANVISA (built-in default)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
 
                     HStack {
-                        SectionHeader("Custos (estimativa)")
+                        SectionHeader("Costs (estimate)")
                         Spacer()
-                        Button("Editar Tabela") { showCostRules = true }
-                            .buttonStyle(.bordered)
+                        Button("Edit Table") { showCostRules = true }
+                            .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.capsule)
                     }
 
                     Button(action: runValidation) {
                         HStack { isRunning ? AnyView(AnyView(ProgressView())) : AnyView(Image(systemName: "checkmark.shield")); Text("Validate") }
-                            .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
                     .disabled(isRunning || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                     if !results.isEmpty {
-                        SectionHeader("Resultados")
+                        SectionHeader("Results")
                         SummaryView(rows: results)
                         ForEach(results) { row in ResultCard(row: row) }
                     }
 
                     if let proof = proofJSON, mode == .proof {
-                        SectionHeader("Prova")
+                        SectionHeader("Proof")
                         Text(proof)
                             .font(.system(.footnote, design: .monospaced))
                             .padding(8)
@@ -130,8 +138,12 @@ struct ContentView: View {
                             Text("Anchor proof (Python API)").font(.subheadline).fontWeight(.semibold)
                             TextField("API Base (ex.: http://127.0.0.1:8000)", text: $proofApiBase).textFieldStyle(.roundedBorder)
                             HStack {
-                                Button("Anchor") { anchorProof() }.buttonStyle(.borderedProminent)
+                                Button("Anchor") { anchorProof() }
+                                    .buttonStyle(.borderedProminent)
+                                    .buttonBorderShape(.capsule)
                                 Button("Status") { checkProofStatus() }
+                                    .buttonStyle(.borderedProminent)
+                                    .buttonBorderShape(.capsule)
                             }
                             if !lastAnchorResponse.isEmpty {
                                 Text(lastAnchorResponse)
@@ -147,7 +159,7 @@ struct ContentView: View {
                     // Compliance: bias/trust index
                     if !results.isEmpty {
                         SectionHeader("Compliance Report")
-                        HStack { Button("Gerar Compliance") { generateCompliance() }; Spacer() }
+                        HStack { Button("Generate Compliance") { generateCompliance() }.buttonStyle(.borderedProminent).buttonBorderShape(.capsule); Spacer() }
                         if !complianceReport.isEmpty {
                             Text("Trust Index: \(String(format: "%.1f", trustIndex*100))%")
                                 .font(.subheadline)
@@ -161,23 +173,37 @@ struct ContentView: View {
                     }
 
                     // Load Guidelines from URL helper
-                    SectionHeader("Carregar Diretrizes por URL")
-                    HStack {
+                    SectionHeader("Load Guidelines by URL")
+                    VStack(alignment: .leading, spacing: 8) {
                         TextField("https://…/guidelines.json", text: $guidelinesURL)
                             .textFieldStyle(.roundedBorder)
-                        Button("Carregar") { loadGuidelinesFromURL() }
-                        Button("Fetch + scores") { fetchAndScore() }
+                        HStack {
+                            Button("Load") { loadGuidelinesFromURL() }
+                                .buttonStyle(.borderedProminent)
+                                .buttonBorderShape(.capsule)
+                            Button("Fetch + scores") { fetchAndScore() }
+                                .buttonStyle(.borderedProminent)
+                                .buttonBorderShape(.capsule)
+                        }
                     }
 
-                    HStack {
-                        TextField("Nome do índice", text: $indexName).textFieldStyle(.roundedBorder)
-                        Button("Salvar índice") { saveIndex() }
-                        Button("Carregar índice") { loadIndex() }
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("Index name", text: $indexName)
+                            .textFieldStyle(.roundedBorder)
+                        HStack {
+                            Button("Save index") { saveIndex() }
+                                .buttonStyle(.borderedProminent)
+                                .buttonBorderShape(.capsule)
+                            Button("Load index") { loadIndex() }
+                                .buttonStyle(.borderedProminent)
+                                .buttonBorderShape(.capsule)
+                        }
                     }
 
-                    Picker("Método", selection: $simMethod) {
+                    Picker("Method", selection: $simMethod) {
                         ForEach(SimMethod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }.pickerStyle(.segmented)
+                    }
+                    .pickerStyle(.menu)
 
                     if !simRows.isEmpty {
                         SectionHeader("Similarity Scores")
@@ -202,6 +228,7 @@ struct ContentView: View {
                 .padding()
             }
             .simultaneousGesture(TapGesture().onEnded { guidelinesFocused = false })
+            .hideKeyboardOnTap()
             .navigationTitle("Validate")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -209,7 +236,7 @@ struct ContentView: View {
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Fechar") { guidelinesFocused = false }
+                    Button("Close") { guidelinesFocused = false }
                 }
             }
         }
@@ -248,30 +275,57 @@ struct ContentView: View {
         results = []
         proofJSON = nil
         DispatchQueue.global(qos: .userInitiated).async {
-            let output: String
-            switch mode {
-            case .single:
-                switch session.provider {
-                case .openai:
-                    output = callOpenAI(prompt: prompt, apiKey: session.openAIKey, model: session.openAIModel, base: session.openAIBase)
-                case .ollama:
-                    output = callOllama(prompt: prompt, base: session.ollamaBase, model: session.ollamaModel)
-                case .anthropic:
-                    let arr: [[String: String]] = [["type": "anthropic", "api_key": session.anthropicKey, "model": session.anthropicModel, "base_url": session.anthropicBase]]
-                    let data = try? JSONSerialization.data(withJSONObject: arr)
-                    let singleJSON = String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
-                    output = callMulti(prompt: prompt, providersJSON: singleJSON, withProof: false)
-                case .default:
-                    output = callDefault(prompt: prompt)
+            func transformed(_ s: Strategy, _ p: String) -> (name: String, text: String) {
+                switch s {
+                case .baseline: return ("Baseline", p)
+                case .structured:
+                    let t = "Using best practices and clear structure, provide headings (General Recommendations, Risks, Dosing, Avoid, Vaccinations) and a short summary. Prompt: \(p)"
+                    return ("Structured", t)
+                case .comprehensive:
+                    let t = "You are a healthcare compliance assistant. Output deterministic JSON with keys: summary, key_points[], risks[], recommendations[], contraindications[], checklist[]. Only output JSON. Prompt: \(p)"
+                    return ("Full (JSON)", t)
+                case .all: return ("", p) // handled externally
                 }
-            case .multi:
-                output = callMulti(prompt: prompt, providersJSON: session.providersJSON(), withProof: false)
-            case .proof:
-                output = callMulti(prompt: prompt, providersJSON: session.providersJSON(), withProof: true)
+            }
+
+            func runOnce(prompt p: String) -> String {
+                switch mode {
+                case .single:
+                    switch session.provider {
+                    case .openai:
+                        return callOpenAI(prompt: p, apiKey: session.openAIKey, model: session.openAIModel, base: session.openAIBase)
+                    case .ollama:
+                        return callOllama(prompt: p, base: session.ollamaBase, model: session.ollamaModel)
+                    case .anthropic:
+                        let arr: [[String: String]] = [["type": "anthropic", "api_key": session.anthropicKey, "model": session.anthropicModel, "base_url": session.anthropicBase]]
+                        let data = try? JSONSerialization.data(withJSONObject: arr)
+                        let singleJSON = String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
+                        return callMulti(prompt: p, providersJSON: singleJSON, withProof: false)
+                    case .default:
+                        return callDefault(prompt: p)
+                    }
+                case .multi:
+                    return callMulti(prompt: p, providersJSON: session.providersJSON(), withProof: false)
+                case .proof:
+                    return callMulti(prompt: p, providersJSON: session.providersJSON(), withProof: true)
+                }
+            }
+
+            var allRows: [ValidationRow] = []
+            if strategy == .all {
+                for s in [Strategy.baseline, .structured, .comprehensive] {
+                    let (name, text) = transformed(s, prompt)
+                    let out = runOnce(prompt: text)
+                    allRows.append(contentsOf: rowsFromOutput(out, strategy: name))
+                }
+            } else {
+                let (name, text) = transformed(strategy, prompt)
+                let out = runOnce(prompt: text)
+                allRows.append(contentsOf: rowsFromOutput(out, strategy: name))
             }
             DispatchQueue.main.async {
                 isRunning = false
-                parseAndDisplay(output)
+                results = allRows.sorted { $0.score > $1.score }
             }
         }
     }
@@ -292,21 +346,21 @@ struct ContentView: View {
         return String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
     }
 
-    private func parseAndDisplay(_ s: String) {
+    private func rowsFromOutput(_ s: String, strategy: String?) -> [ValidationRow] {
         if mode == .proof, let data = s.data(using: .utf8),
            let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
            let arr = obj["results"], let arrData = try? JSONSerialization.data(withJSONObject: arr),
            let json = try? JSONSerialization.jsonObject(with: arrData) as? [[String: Any]] {
             self.proofJSON = pretty(obj)
-            self.results = rows(from: json)
-            return
+            return rows(from: json, strategy: strategy)
         }
         if let data = s.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-            self.results = rows(from: json)
+            return rows(from: json, strategy: strategy)
         }
+        return []
     }
 
-    private func rows(from arr: [[String: Any]]) -> [ValidationRow] {
+    private func rows(from arr: [[String: Any]], strategy: String?) -> [ValidationRow] {
         let tokensIn = PantherBridge.tokenCount(prompt)
         let rules = costRulesJson
         return arr.compactMap { r -> ValidationRow? in
@@ -316,8 +370,10 @@ struct ContentView: View {
             let text = r["raw_text"] as? String ?? ""
             let tokensOut = PantherBridge.tokenCount(text)
             let cost = PantherBridge.calculateCost(tokensIn: tokensIn, tokensOut: tokensOut, provider: name, rules: rules)
-            return ValidationRow(provider: name, score: score, latencyMs: lat, tokensIn: tokensIn, tokensOut: tokensOut, costUSD: cost, response: text)
-        }.sorted { $0.score > $1.score }
+            let coh = PantherBridge.coherence(text)
+            let flu = PantherBridge.fluency(text)
+            return ValidationRow(provider: name, score: score, latencyMs: lat, tokensIn: tokensIn, tokensOut: tokensOut, costUSD: cost, response: text, strategy: strategy, coherence: coh, fluency: flu)
+        }
     }
 
     private func pretty(_ obj: Any) -> String {
@@ -345,18 +401,47 @@ struct ContentView: View {
 
     // MARK: - Compliance helpers
     private func generateCompliance() {
-        // bias over all responses
-        let samples = results.map { $0.response }
-        let s = PantherBridge.biasDetect(samples: samples)
-        complianceReport = s
-        // simple trust index heuristic: avg adherence penalized by bias
-        let avgAdh = results.map{ $0.score/100.0 }.reduce(0,+) / Double(results.count)
-        if let d = s.data(using: .utf8),
-           let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
-           let bias = o["bias_score"] as? Double {
-            trustIndex = max(0, min(1, avgAdh * (1.0 - bias)))
+        // Consider only successful rows (score > 0) to avoid upstream error rows skewing trust
+        let ok = results.filter { $0.score > 0 }
+        guard !ok.isEmpty else {
+            complianceReport = "{\"notice\":\"no valid results to compute compliance\"}"
+            trustIndex = 0
+            return
+        }
+
+        // Domain‑aligned safety coverage check (simple substring heuristics over all responses)
+        // This replaces the previous pronoun-based bias metric.
+        let text = ok.map { $0.response.lowercased() }.joined(separator: "\n")
+        func hasAny(_ keys: [String]) -> Bool { keys.contains { text.contains($0) } }
+
+        let coverage: [String: Bool] = [
+            "consultation": hasAny(["consult healthcare provider", "consult a doctor", "consult your doctor", "professional guidance", "medical consultation"]),
+            "risk_caution": hasAny(["contraindicated", "avoid ", " do not ", "not safe", "risk", "harm", "third trimester", "tetracycline", "isotretinoin", "nsaid", "ibuprofen"]),
+            "dose_minimum": hasAny(["lowest effective dose", "shortest duration", "dosage", "dose"]),
+            "prenatal_vitamins": hasAny(["prenatal vitamin", "prenatal vitamins", "folic acid", "folate"]),
+            "vaccinations": hasAny(["flu shot", "tdap", "vaccination", "vaccine"]),
+            "labeling_info": hasAny(["fda pregnancy", "pllr", "pregnancy and lactation labeling"]) 
+        ]
+        let present = coverage.values.filter { $0 }.count
+        let total = coverage.count
+        let coverageRatio = total > 0 ? Double(present) / Double(total) : 0.0
+
+        // Trust Index: average adherence scaled by safety coverage ratio (0..1)
+        let avgAdh = ok.map{ $0.score/100.0 }.reduce(0,+) / Double(ok.count)
+        trustIndex = max(0, min(1, avgAdh * coverageRatio))
+
+        // Build a compact JSON report: coverage booleans + ratio + missing categories
+        let missing = coverage.filter { !$0.value }.map { $0.key }
+        let report: [String: Any] = [
+            "safety_coverage": coverage,
+            "coverage_ratio": coverageRatio,
+            "missing_categories": missing
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted]),
+           let s = String(data: data, encoding: .utf8) {
+            complianceReport = s
         } else {
-            trustIndex = avgAdh
+            complianceReport = "{}"
         }
     }
 

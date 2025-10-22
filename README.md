@@ -15,6 +15,7 @@ What’s Included (PoC summary)
 - Multi‑provider validation (OpenAI/Ollama/Anthropic via features), ranking by adherence, latency tracking, token/cost estimation
 - Proof generation/verification and optional anchoring on Ethereum (API helper)
 - Guidelines Similarity (FFI): ingest JSON (http/s3/gs) and compute similarity by BOW/Jaccard/Hybrid; optional embeddings (OpenAI/Ollama) with cosine
+  - Local methods are offline and private: BOW (Bag‑of‑Words cosine over normalized term‑frequency vectors), Jaccard (set overlap |A∩B|/|A∪B|), and Hybrid (0.6×BOW + 0.4×Jaccard). Embeddings require credentials/endpoint.
 - Storage helpers (in‑memory/sled) and log capture for audit trails
 - Bias and content metrics (BLEU, ROUGE‑L, accuracy, fluency, diversity, plagiarism)
 - Samples for iOS (Swift), Android (Kotlin), Flutter (Dart FFI) e React Native (Android/iOS)
@@ -40,6 +41,7 @@ iOS Sample — Tabs Overview
     - With Proof: igual ao Multi, mas retorna também um objeto `proof` (hash combinado) para auditoria/âncora.
   - Diretrizes: opcionalmente use um JSON customizado (senão usa ANVISA embutido). Os modos Multi/Proof também possuem variantes `validateCustom*` quando diretrizes customizadas estão ativas.
   - Similarity (na mesma tela): carregar diretrizes por URL, salvar/carregar um índice nomeado e calcular “similarity” (BOW/Jaccard/Hybrid/Embeddings) com `topK`.
+  - BOW/Jaccard/Hybrid run locally (offline). Use Embeddings (OpenAI/Ollama) only if you want vector similarity via external endpoints.
   - Tokens e custo: a tela estima custo por provider com base na contagem de tokens e na tabela de preços.
   - ![Validate](docs/images/validate.png)
 
@@ -382,9 +384,9 @@ AI Evaluation CLI (Batch)
   - Formato de `costs.json` (exemplos):
     ```json
     [
-      {"provider":"openai:gpt-4o-mini", "usd_per_1k_in": 0.005, "usd_per_1k_out": 0.015},
-      {"provider":"openai:", "usd_per_1k_in": 0.010, "usd_per_1k_out": 0.030},
-      {"provider":"*", "usd_per_1k_in": 0.000, "usd_per_1k_out": 0.000}
+      {"provider":"openai:gpt-4o-mini", "usd_per_1k_in": 0.00015, "usd_per_1k_out": 0.00060},
+      {"provider":"openai:gpt-4.1",     "usd_per_1k_in": 0.00500, "usd_per_1k_out": 0.01500},
+      {"provider":"*",                   "usd_per_1k_in": 0.00000, "usd_per_1k_out": 0.00000}
     ]
     ```
   - API-backed metrics (chamando a API Python):

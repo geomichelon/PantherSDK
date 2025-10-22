@@ -22,6 +22,7 @@ struct ProvidersScreen: View {
     @State private var showHelp: Bool = false
     @State private var showJsonAlert: Bool = false
     @State private var jsonAlertText: String = ""
+    @State private var showResetAlert: Bool = false
     // JSON validation helpers for Advanced LLMs
     private var advTrimmed: String { session.advancedProvidersJSON.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var advIsEmpty: Bool { advTrimmed.isEmpty }
@@ -56,12 +57,12 @@ struct ProvidersScreen: View {
                         ModelPicker(title: "Model", presets: CostRules.anthropicModels, selection: $session.anthropicModel)
                     }
                 } else {
-                    Section { Text("Usando providers de ambiente (Default)").font(.caption).foregroundColor(.secondary) }
+                    Section { Text("Using environment providers (Default)").font(.caption).foregroundColor(.secondary) }
                 }
 
                 // Advanced: allow multi-provider JSON override used by Validate -> Multi/With Proof
-                Section(header: Text("LLMs (JSON avançado)")) {
-                    Toggle("Usar LLMs JSON (avançado)", isOn: $session.useAdvancedProvidersJSON)
+                Section(header: Text("LLMs (Advanced JSON)")) {
+                    Toggle("Use LLMs (advanced JSON)", isOn: $session.useAdvancedProvidersJSON)
                     if session.useAdvancedProvidersJSON {
                         TextEditor(text: $session.advancedProvidersJSON)
                             .focused($advProvidersFocused)
@@ -71,60 +72,71 @@ struct ProvidersScreen: View {
                             .background(Color(UIColor.secondarySystemBackground))
                             .cornerRadius(8)
                         if advIsEmpty {
-                            Text("JSON vazio — Multi usará o LLM Single (fallback)")
+                            Text("Empty JSON — Multi will use Single LLM (fallback)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         } else if !advIsValid {
-                            Text("JSON inválido — não é JSON válido")
+                            Text("Invalid JSON — not valid JSON")
                                 .font(.caption)
                                 .foregroundColor(.red)
                         } else {
-                            Text("JSON válido")
+                            Text("Valid JSON")
                                 .font(.caption)
                                 .foregroundColor(.green)
                         }
                         VStack(alignment: .leading, spacing: 8) {
                             Button {
-                                // Exemplo pronto: OpenAI chatgpt-5 + gpt-4o
+                                // Ready-made example: OpenAI (all preset models)
                                 let base = session.openAIBase.isEmpty ? "https://api.openai.com" : session.openAIBase
                                 let key = session.openAIKey
-                                let arr: [[String: String]] = [
-                                    ["type": "openai", "api_key": key, "base_url": base, "model": "chatgpt-5"],
-                                    ["type": "openai", "api_key": key, "base_url": base, "model": "gpt-4o"]
-                                ]
+                                var arr: [[String: String]] = []
+                                for mdl in CostRules.openAIModels {
+                                    arr.append(["type": "openai", "api_key": key, "base_url": base, "model": mdl])
+                                }
                                 if let data = try? JSONSerialization.data(withJSONObject: arr, options: [.prettyPrinted]), let s = String(data: data, encoding: .utf8) {
                                     session.useAdvancedProvidersJSON = true
                                     session.advancedProvidersJSON = s
                                     session.save()
-                                    jsonAlertText = "Exemplo preenchido. JSON avançado habilitado."
+                                    jsonAlertText = "OpenAI models example filled. Advanced JSON enabled."
                                     showJsonAlert = true
                                 }
                             } label: {
-                                Label("Preencher Exemplo", systemImage: "wand.and.stars")
+                                Label("Fill Example (OpenAI — all presets)", systemImage: "wand.and.stars")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
 
                             Button {
                                 _ = session.save()
-                                jsonAlertText = "JSON salvo"
+                                jsonAlertText = "JSON saved"
                                 showJsonAlert = true
                             } label: {
-                                Label("Salvar JSON", systemImage: "square.and.arrow.down")
+                                Label("Save JSON", systemImage: "square.and.arrow.down")
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.capsule)
                         }
-                        Text("O JSON acima será usado nos modos Multi/With Proof. Deixe desativado para usar a seleção simples desta tela.")
+                        Text("The JSON above will be used in Multi/With Proof. Turn off to use the single selection on this screen.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
-                Section(header: Text("Custos")) {
-                    Button("Editar Tabela") { showCostRules = true }
+                Section(header: Text("Costs")) {
+                    Button("Edit Table") { showCostRules = true }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.capsule)
                 }
-                Section { Button("Salvar sessão") { session.save() } }
+                Section {
+                    Button("Save Session") { session.save() }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.capsule)
+                    Button(role: .destructive) { showResetAlert = true } label: { Text("Reset Session") }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.capsule)
+                }
             }
             .simultaneousGesture(TapGesture().onEnded { advProvidersFocused = false })
+            .hideKeyboardOnTap()
             .navigationTitle("LLMs")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -132,10 +144,18 @@ struct ProvidersScreen: View {
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Fechar") { advProvidersFocused = false }
+                Button("Close") { advProvidersFocused = false }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
                 }
             }
             .alert(jsonAlertText, isPresented: $showJsonAlert) { Button("OK", role: .cancel) {} }
+            .alert("Reset session?", isPresented: $showResetAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Reset", role: .destructive) { session.reset() }
+            } message: {
+                Text("This will clear saved API keys, URLs, models and the advanced JSON.")
+            }
         }
         .sheet(isPresented: $showCostRules) {
             NavigationView {
@@ -159,13 +179,13 @@ private struct CostRulesEditor: View {
                 .background(Color(UIColor.secondarySystemBackground))
                 .cornerRadius(8)
             HStack {
-                Button("Restaurar Padrão") { costRulesJson = CostRules.defaultJSON }
+                Button("Restore Default") { costRulesJson = CostRules.defaultJSON }
                 Spacer()
-                Button("Fechar") { dismiss() }.buttonStyle(.borderedProminent)
+                Button("Close") { dismiss() }.buttonStyle(.borderedProminent)
             }
         }
         .padding()
-        .navigationTitle("Tabela de Custos")
+        .navigationTitle("Cost Table")
     }
 }
 
@@ -184,13 +204,13 @@ struct GuidelinesScreen: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader("Prompt para similaridade")
+                SectionHeader("Prompt for similarity")
                     TextEditor(text: $prompt)
                         .frame(minHeight: 70)
                         .padding(8)
                         .background(Color(UIColor.secondarySystemBackground))
                         .cornerRadius(8)
-                    SectionHeader("Diretrizes")
+                    SectionHeader("Guidelines")
                     Toggle("Usar diretrizes customizadas (JSON)", isOn: $useCustomGuidelines)
                     if useCustomGuidelines {
                         TextEditor(text: $customGuidelines)
@@ -200,19 +220,19 @@ struct GuidelinesScreen: View {
                             .cornerRadius(8)
                             .font(.caption)
                     } else {
-                        Text("ANVISA (padrão embutido)").font(.caption).foregroundColor(.secondary)
+                        Text("ANVISA (built-in default)").font(.caption).foregroundColor(.secondary)
                     }
                     HStack {
                         TextField("https://…/guidelines.json", text: $guidelinesURL).textFieldStyle(.roundedBorder)
-                        Button("Carregar") { loadGuidelinesFromURL() }
+                        Button("Load") { loadGuidelinesFromURL() }
                         Button("Fetch + scores") { fetchAndScore() }
                     }
                     HStack {
-                        TextField("Nome do índice", text: $indexName).textFieldStyle(.roundedBorder)
-                        Button("Salvar índice") { saveIndex() }
-                        Button("Carregar índice") { loadIndex() }
+                        TextField("Index name", text: $indexName).textFieldStyle(.roundedBorder)
+                        Button("Save index") { saveIndex() }
+                        Button("Load index") { loadIndex() }
                     }
-                    Picker("Método", selection: $simMethod) {
+                    Picker("Method", selection: $simMethod) {
                         ForEach(ContentView.SimMethod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.menu)
@@ -246,6 +266,7 @@ struct GuidelinesScreen: View {
                 }
             }
         }
+        .hideKeyboardOnTap()
         .sheet(isPresented: $showHelp) { NavigationView { HelpView() } }
     }
 
@@ -283,11 +304,11 @@ struct GuidelinesScreen: View {
 
     private func methodDescription(_ m: ContentView.SimMethod) -> String {
         switch m {
-        case .bow: return "BOW: Bag‑of‑Words com cosseno (local/rápido)."
-        case .jaccard: return "Jaccard: similaridade de conjuntos de tokens (local/rápido)."
-        case .hybrid: return "Hybrid: combinação BOW + Jaccard (equilíbrio de precisão/recall)."
-        case .embedOpenAI: return "Embeddings (OpenAI): similaridade vetorial; requer PANTHER_OPENAI_API_KEY."
-        case .embedOllama: return "Embeddings (Ollama): similaridade vetorial local; requer PANTHER_OLLAMA_BASE."
+        case .bow: return "BOW: Bag‑of‑Words with cosine (local/fast)."
+        case .jaccard: return "Jaccard: set similarity of tokens (local/fast)."
+        case .hybrid: return "Hybrid: BOW + Jaccard (balanced precision/recall)."
+        case .embedOpenAI: return "Embeddings (OpenAI): vector similarity; requires PANTHER_OPENAI_API_KEY."
+        case .embedOllama: return "Embeddings (Ollama): local vector similarity; requires PANTHER_OLLAMA_BASE."
         }
     }
 
@@ -311,16 +332,16 @@ struct HelpView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader("LLMs")
-                Text("Configure o LLM 'Single' e use 'LLMs (JSON avançado)' para Multi/Proof.")
+                Text("Configure the 'Single' LLM and use 'LLMs (Advanced JSON)' for Multi/Proof.")
                     .font(.subheadline)
-                SectionHeader("LLMs (JSON avançado)")
-                Text("Exemplos de listas para Multi/Proof:")
+                SectionHeader("LLMs (Advanced JSON)")
+                Text("Example lists for Multi/Proof:")
                     .font(.subheadline)
-                Text("OpenAI — chatgpt-5 + gpt-4o").font(.caption).foregroundColor(.secondary)
+                Text("OpenAI — gpt-4o + gpt-4.1-mini").font(.caption).foregroundColor(.secondary)
                 Text("""
 [
-  { "type": "openai", "api_key": "sk-…", "base_url": "https://api.openai.com", "model": "chatgpt-5" },
-  { "type": "openai", "api_key": "sk-…", "base_url": "https://api.openai.com", "model": "gpt-4o" }
+  { "type": "openai", "api_key": "sk-…", "base_url": "https://api.openai.com", "model": "gpt-4o" },
+  { "type": "openai", "api_key": "sk-…", "base_url": "https://api.openai.com", "model": "gpt-4.1-mini" }
 ]
 """)
                 .font(.system(.footnote, design: .monospaced))
@@ -349,21 +370,25 @@ struct HelpView: View {
                 .padding(8)
                 .background(Color(UIColor.secondarySystemBackground))
                 .cornerRadius(8)
-                SectionHeader("Validate")
-                Text("Single: 1 LLM. Multi: todos do JSON. With Proof: Multi + hash de auditoria.")
+                SectionHeader("Validate — Modes")
+                Text("Single — Runs the provider/model selected in the Providers tab.")
+                    .font(.subheadline)
+                Text("Multi — Runs all providers from ‘LLMs (Advanced JSON)’ in parallel (falls back to Single if empty).")
+                    .font(.subheadline)
+                Text("With Proof — Same as Multi, plus a {results, proof} bundle with a combined audit hash used by Anchor/Status.")
                     .font(.subheadline)
                 SectionHeader("Guidelines")
-                Text("Sem JSON: ANVISA. Com JSON: array {topic, expected_terms[]}.")
+                Text("Without JSON: uses built-in ANVISA. With JSON: array {topic, expected_terms[]}. Adherence checks presence of expected terms.")
                     .font(.subheadline)
                 SectionHeader("Similarity")
-                Text("BOW/Jaccard/Hybrid locais; Embeddings exigem credenciais/endpoint.")
+                Text("BOW/Jaccard/Hybrid are local; Embeddings (OpenAI/Ollama) require credentials/endpoint.")
                     .font(.subheadline)
-                SectionHeader("Custos")
-                Text("Tabela de preços por 1k tokens; usada para estimativa em Validate.")
+                SectionHeader("Costs")
+                Text("Price table per 1k tokens; used to estimate cost in Validate.")
                     .font(.subheadline)
             }
             .padding()
         }
-        .navigationTitle("Ajuda")
+        .navigationTitle("Help")
     }
 }

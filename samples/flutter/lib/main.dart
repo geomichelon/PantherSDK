@@ -8,14 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() => runApp(const MyApp());
 
 const defaultCostRulesJson = '[\n'
-    '  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.15, "usd_per_1k_out": 0.60},\n'
-    '  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.30, "usd_per_1k_out": 1.20},\n'
-    '  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
-    '  {"match": "openai:gpt-4o",       "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
-    '  {"match": "openai:chatgpt-5",    "usd_per_1k_in": 5.00,  "usd_per_1k_out": 15.00},\n'
-    '  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},\n'
-    '  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00},\n'
-    '  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,  "usd_per_1k_out": 0.00}\n'
+    '  {"match": "openai:gpt-4o-mini",  "usd_per_1k_in": 0.00015, "usd_per_1k_out": 0.00060},\n'
+    '  {"match": "openai:gpt-4.1-mini", "usd_per_1k_in": 0.00030, "usd_per_1k_out": 0.00120},\n'
+    '  {"match": "openai:gpt-4.1",      "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},\n'
+    '  {"match": "openai:gpt-4o",       "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},\n'
+    '  {"match": "openai:chatgpt-5",    "usd_per_1k_in": 0.00500,  "usd_per_1k_out": 0.01500},\n'
+    '  {"match": "ollama:llama3",       "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00},\n'
+    '  {"match": "ollama:phi3",         "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00},\n'
+    '  {"match": "ollama:mistral",      "usd_per_1k_in": 0.00,    "usd_per_1k_out": 0.00}\n'
     ']';
 const openAIModels = [
   'gpt-4o-mini',

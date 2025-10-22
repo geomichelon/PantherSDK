@@ -608,6 +608,11 @@ struct CostRuleCompat {
     usd_per_1k_in: Option<f64>,
     #[serde(default)]
     usd_per_1k_out: Option<f64>,
+    // Optional alternative: allow prices per million tokens for convenience
+    #[serde(default)]
+    usd_per_1m_in: Option<f64>,
+    #[serde(default)]
+    usd_per_1m_out: Option<f64>,
 }
 
 fn select_rule<'a>(prov: &str, rules: &'a [CostRuleCompat]) -> Option<&'a CostRuleCompat> {
@@ -652,8 +657,16 @@ pub extern "C" fn panther_calculate_cost(
         }
     }
     if let Some(rule) = select_rule(&prov, &rules_vec) {
-        let cin = rule.usd_per_1k_in.unwrap_or(0.0);
-        let cout = rule.usd_per_1k_out.unwrap_or(0.0);
+        let cin = match (rule.usd_per_1k_in, rule.usd_per_1m_in) {
+            (Some(v), _) => v,
+            (None, Some(m)) => m / 1000.0,
+            _ => 0.0,
+        };
+        let cout = match (rule.usd_per_1k_out, rule.usd_per_1m_out) {
+            (Some(v), _) => v,
+            (None, Some(m)) => m / 1000.0,
+            _ => 0.0,
+        };
         let ti = (tokens_in.max(0) as f64) / 1000.0;
         let to = (tokens_out.max(0) as f64) / 1000.0;
         return ti * cin + to * cout;

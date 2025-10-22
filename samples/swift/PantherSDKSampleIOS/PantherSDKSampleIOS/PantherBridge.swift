@@ -42,6 +42,10 @@ enum PantherBridge {
         return json.withCString { j in strPtr(panther_bias_detect(j)) }
     }
 
+    // MARK: - Content Metrics (BLEU/Coherence/Fluency)
+    static func coherence(_ text: String) -> Double { text.withCString { t in panther_metrics_coherence(t) } }
+    static func fluency(_ text: String) -> Double { text.withCString { t in panther_metrics_fluency(t) } }
+
     static func loadGuidelinesFromURL(_ url: String, completion: @escaping (String?) -> Void) {
         // Support http(s), and naive s3:// / gs:// mapping to public endpoints
         func mapSpecial(_ s: String) -> URL? {
@@ -147,6 +151,11 @@ private func panther_validation_run_custom(_ prompt: UnsafePointer<CChar>, _ pro
 private func panther_validation_run_custom_with_proof(_ prompt: UnsafePointer<CChar>, _ providersJson: UnsafePointer<CChar>, _ guidelinesJson: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
 @_silgen_name("panther_bias_detect")
 private func panther_bias_detect(_ samplesJson: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("panther_metrics_coherence")
+private func panther_metrics_coherence(_ text: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_fluency")
+private func panther_metrics_fluency(_ text: UnsafePointer<CChar>) -> Double
 
 @_silgen_name("panther_guidelines_ingest_json")
 private func panther_guidelines_ingest_json(_ guidelinesJson: UnsafePointer<CChar>) -> Int32

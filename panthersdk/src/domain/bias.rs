@@ -22,9 +22,19 @@ pub fn detect_bias(samples: &[String]) -> BiasReport {
             if c > 0 { *counts.entry((*grp).into()).or_insert(0) += c; total += c; }
         }
     }
-    let max = counts.values().copied().max().unwrap_or(0) as f64;
-    let min = counts.values().copied().min().unwrap_or(0) as f64;
-    let bias_score = if total == 0 { 0.0 } else { if max == 0.0 { 0.0 } else { (max - min) / (max.max(1.0)) } };
+    // Revised heuristic:
+    // - If only neutral pronouns (or none) are present, treat bias as 0.
+    // - Otherwise, compute disparity only between male and female counts.
+    let m = *counts.get("male").unwrap_or(&0) as f64;
+    let f = *counts.get("female").unwrap_or(&0) as f64;
+    let n = *counts.get("neutral").unwrap_or(&0) as f64;
+    let bias_score = if total == 0 || (m == 0.0 && f == 0.0 && n > 0.0) {
+        0.0
+    } else if m == 0.0 && f == 0.0 {
+        0.0
+    } else {
+        (m - f).abs() / m.max(f).max(1.0)
+    };
     BiasReport { group_counts: counts, bias_score }
 }
 

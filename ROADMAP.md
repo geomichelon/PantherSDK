@@ -54,6 +54,7 @@ Compliance/Guidelines
 - [x] Guidelines ANVISA de exemplo
 - [x] Ingestão de guidelines via FFI (http/s3/gs) e índice em memória
 - [x] Similaridade local (BOW/Jaccard/Hybrid) e embeddings (OpenAI/Ollama) via FFI
+  - Nota: BOW/Jaccard/Hybrid são métodos locais/offline (privacidade); Embeddings dependem de endpoints externos.
 - [ ] `trust_index` e `bias_score` avançados
 
 Blockchain / Verificação

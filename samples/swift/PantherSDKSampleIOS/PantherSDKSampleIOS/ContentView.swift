@@ -94,6 +94,12 @@ struct ContentView: View {
                             .background(Color(.secondarySystemBackground))
                             .cornerRadius(8)
                             .font(.caption)
+
+                        Button("Preencher com exemplo") {
+                            customGuidelines = getExampleGuidelines()
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.top, 4)
                     } else {
                         Text("ANVISA (padrão embutido)")
                             .font(.caption)
@@ -343,5 +349,56 @@ struct ContentView: View {
         PantherBridge.checkProofStatus(apiBase: proofApiBase, hash: hash) { s in
             DispatchQueue.main.async { self.lastAnchorResponse = s }
         }
+    }
+
+    private func getExampleGuidelines() -> String {
+        let exampleGuidelines = [
+            [
+                "topic": "Segurança em medicamentos",
+                "expected_terms": [
+                    "contraindicação",
+                    "interação medicamentosa",
+                    "efeitos adversos",
+                    "posologia",
+                    "advertências",
+                    "cuidados especiais",
+                    "monitoramento",
+                    "orientação médica"
+                ]
+            ],
+            [
+                "topic": "Informações técnicas",
+                "expected_terms": [
+                    "princípio ativo",
+                    "mecanismo de ação",
+                    "farmacocinética",
+                    "farmacodinâmica",
+                    "biodisponibilidade",
+                    "meia-vida",
+                    "clearance",
+                    "volume de distribuição"
+                ]
+            ],
+            [
+                "topic": "Aspectos regulatórios",
+                "expected_terms": [
+                    "ANVISA",
+                    "registro",
+                    "autorização",
+                    "normas técnicas",
+                    "farmacovigilância",
+                    "estudos clínicos",
+                    "evidências científicas",
+                    "conformidade regulatória"
+                ]
+            ]
+        ]
+
+        if let jsonData = try? JSONSerialization.data(withJSONObject: exampleGuidelines, options: [.prettyPrinted]),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            return jsonString
+        }
+
+        return "[]"
     }
 }

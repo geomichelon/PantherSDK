@@ -52,10 +52,30 @@ struct ContentView: View {
                         ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    Picker("Provider", selection: $provider) {
-                        ForEach(Provider.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+
+                    if mode == .multi {
+                        SectionHeader("Providers a serem testados")
+                        let activeProviders = getActiveProviders()
+                        if activeProviders.isEmpty {
+                            Text("Configure pelo menos uma chave API para testar")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(activeProviders, id: \.self) { provider in
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text(provider)
+                                        .font(.caption)
+                                }
+                            }
+                        }
+                    } else {
+                        Picker("Provider", selection: $provider) {
+                            ForEach(Provider.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
                     }
-                    .pickerStyle(.segmented)
 
                     Group {
                         if provider == .openai {
@@ -235,17 +255,47 @@ struct ContentView: View {
 
     private func buildProvidersJSON() -> String {
         var arr: [[String: String]] = []
-        switch provider {
-        case .openai:
-            arr.append(["type": "openai", "api_key": apiKey, "model": openAIModel, "base_url": openAIBase])
-        case .ollama:
-            arr.append(["type": "ollama", "model": ollamaModel, "base_url": ollamaBase])
-        case .anthropic:
-            arr.append(["type": "anthropic", "api_key": anthropicKey, "model": anthropicModel, "base_url": anthropicBase])
-        case .default:
-            break
+
+        // No modo Multi, incluir todos os provedores LLM disponíveis com todos os seus modelos
+        if mode == .multi {
+            // OpenAI - se tem chave, testar todos os modelos disponíveis
+            if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                for model in CostRules.openAIModels {
+                    arr.append(["type": "openai", "api_key": apiKey, "model": model, "base_url": openAIBase])
+                }
+            }
+
+            // Ollama - sempre disponível, testar todos os modelos
+            for model in CostRules.ollamaModels {
+                arr.append(["type": "ollama", "model": model, "base_url": ollamaBase])
+            }
+
+            // Anthropic - se tem chave, testar todos os modelos disponíveis
+            if !anthropicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                for model in CostRules.anthropicModels {
+                    arr.append(["type": "anthropic", "api_key": anthropicKey, "model": model, "base_url": anthropicBase])
+                }
+            }
+        } else {
+            // Modo Single - usar apenas o provedor selecionado
+            switch provider {
+            case .openai:
+                arr.append(["type": "openai", "api_key": apiKey, "model": openAIModel, "base_url": openAIBase])
+            case .ollama:
+                arr.append(["type": "ollama", "model": ollamaModel, "base_url": ollamaBase])
+            case .anthropic:
+                arr.append(["type": "anthropic", "api_key": anthropicKey, "model": anthropicModel, "base_url": anthropicBase])
+            case .default:
+                break
+            }
         }
-        arr.append(["type": "default", "model": "anvisa", "base_url": ""]) // comparação
+
+        // Incluir ANVISA APENAS se não estiver usando diretrizes customizadas
+        // ANVISA é um conjunto de diretrizes, não um modelo LLM
+        if !useCustomGuidelines {
+            arr.append(["type": "default", "model": "anvisa", "base_url": ""])
+        }
+
         let data = try? JSONSerialization.data(withJSONObject: arr)
         return String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
     }
@@ -400,5 +450,55 @@ struct ContentView: View {
         }
 
         return "[]"
+    }
+
+    private func getActiveProviders() -> [String] {
+        var providers: [String] = []
+
+        // No modo Multi, mostrar todos os modelos LLM que serão testados
+        if mode == .multi {
+            // OpenAI - se tem chave, mostrar todos os modelos que serão testados
+            if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                for model in CostRules.openAIModels {
+                    providers.append("OpenAI (\(model))")
+                }
+            }
+
+            // Ollama - sempre disponível, mostrar todos os modelos
+            for model in CostRules.ollamaModels {
+                providers.append("Ollama (\(model))")
+            }
+
+            // Anthropic - se tem chave, mostrar todos os modelos
+            if !anthropicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                for model in CostRules.anthropicModels {
+                    providers.append("Anthropic (\(model))")
+                }
+            }
+        } else {
+            // Modo Single - mostrar apenas o modelo selecionado
+            switch provider {
+            case .openai:
+                if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    providers.append("OpenAI (\(openAIModel))")
+                }
+            case .ollama:
+                providers.append("Ollama (\(ollamaModel))")
+            case .anthropic:
+                if !anthropicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    providers.append("Anthropic (\(anthropicModel))")
+                }
+            case .default:
+                break
+            }
+        }
+
+        // Incluir ANVISA APENAS se não estiver usando diretrizes customizadas
+        // ANVISA é um conjunto de diretrizes, não um modelo LLM
+        if !useCustomGuidelines {
+            providers.append("ANVISA (Default)")
+        }
+
+        return providers
     }
 }

@@ -195,6 +195,7 @@
             CURRENT_PROJECT_VERSION = 1;
             DEVELOPMENT_TEAM = "";
             ENABLE_PREVIEWS = YES;
+            EXCLUDED_ARCHS = x86_64;
             FRAMEWORK_SEARCH_PATHS = (
                 "$(inherited)",
                 "$(PROJECT_DIR)/../frameworkIOS",
@@ -204,6 +205,7 @@
             INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
             INFOPLIST_KEY_UILaunchScreen_Generation = YES;
             LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+            ONLY_ACTIVE_ARCH = YES;
             PRODUCT_BUNDLE_IDENTIFIER = com.globant.PantherSDKSampleIOS;
             PRODUCT_NAME = "$(TARGET_NAME)";
             SWIFT_EMIT_LOC_STRINGS = YES;
@@ -219,6 +221,7 @@
             CURRENT_PROJECT_VERSION = 1;
             DEVELOPMENT_TEAM = "";
             ENABLE_PREVIEWS = YES;
+            EXCLUDED_ARCHS = x86_64;
             FRAMEWORK_SEARCH_PATHS = (
                 "$(inherited)",
                 "$(PROJECT_DIR)/../frameworkIOS",
@@ -228,6 +231,7 @@
             INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
             INFOPLIST_KEY_UILaunchScreen_Generation = YES;
             LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+            ONLY_ACTIVE_ARCH = YES;
             PRODUCT_BUNDLE_IDENTIFIER = com.globant.PantherSDKSampleIOS;
             PRODUCT_NAME = "$(TARGET_NAME)";
             SWIFT_EMIT_LOC_STRINGS = YES;

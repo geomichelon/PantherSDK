@@ -32,6 +32,7 @@ struct ContentView: View {
     // Compliance & Proof extras
     @State private var complianceReport: String = ""
     @State private var trustIndex: Double = 0
+    @State private var includeFailedModels: Bool = false
     @State private var guidelinesURL: String = ""
     @State private var proofApiBase: String = "http://127.0.0.1:8000"
     @State private var lastAnchorResponse: String = ""
@@ -121,7 +122,7 @@ struct ContentView: View {
                         .buttonStyle(.bordered)
                         .padding(.top, 4)
                     } else {
-                        Text("ANVISA (padrão embutido)")
+                        Text("ANVISA (diretrizes padrão)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -176,16 +177,42 @@ struct ContentView: View {
                     // Compliance: bias/trust index
                     if !results.isEmpty {
                         SectionHeader("Compliance Report")
-                        HStack { Button("Gerar Compliance") { generateCompliance() }; Spacer() }
+                        HStack {
+                            Button("Gerar Compliance") { generateCompliance() }
+                            Spacer()
+                            // Toggle para incluir/excluir modelos com erro
+                            Toggle("Incluir modelos com erro", isOn: $includeFailedModels)
+                                .toggleStyle(.switch)
+                                .font(.caption)
+                        }
+
                         if !complianceReport.isEmpty {
+                            // Mostrar estatísticas dos modelos
+                            let successfulModels = results.filter { $0.score > 0 }
+                            let failedModels = results.filter { $0.score == 0 }
+
+                            HStack {
+                                Text("✅ \(successfulModels.count) modelos funcionaram")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                                Spacer()
+                                Text("❌ \(failedModels.count) modelos com erro")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                            .padding(.vertical, 4)
+
                             Text("Trust Index: \(String(format: "%.1f", trustIndex*100))%")
                                 .font(.subheadline)
                                 .foregroundColor(trustIndex >= 0.8 ? .green : (trustIndex >= 0.6 ? .orange : .red))
-                            Text(complianceReport)
+
+                            TextEditor(text: $complianceReport)
                                 .font(.system(.footnote, design: .monospaced))
+                                .frame(minHeight: 120)
                                 .padding(8)
                                 .background(Color(.secondarySystemBackground))
                                 .cornerRadius(8)
+                                .disabled(false)  // Permitir edição
                         }
                     }
 
@@ -291,7 +318,8 @@ struct ContentView: View {
         }
 
         // Incluir ANVISA APENAS se não estiver usando diretrizes customizadas
-        // ANVISA é um conjunto de diretrizes, não um modelo LLM
+        // ANVISA é um conjunto de diretrizes (guidelines), não um modelo LLM
+        // ANVISA funciona como um arquivo JSON de diretrizes padrão
         if !useCustomGuidelines {
             arr.append(["type": "default", "model": "anvisa", "base_url": ""])
         }
@@ -353,12 +381,27 @@ struct ContentView: View {
 
     // MARK: - Compliance helpers
     private func generateCompliance() {
-        // bias over all responses
-        let samples = results.map { $0.response }
+        // Filtrar resultados baseado na opção do usuário
+        // includeFailedModels = true: incluir todos os modelos (funcionaram + falharam)
+        // includeFailedModels = false: incluir apenas modelos que funcionaram (score > 0)
+        let filteredResults = includeFailedModels ? results : results.filter { $0.score > 0 }
+
+        if filteredResults.isEmpty {
+            complianceReport = "Nenhum modelo válido para análise de compliance."
+            trustIndex = 0.0
+            return
+        }
+
+        // bias over filtered responses
+        let samples = filteredResults.map { $0.response }
         let s = PantherBridge.biasDetect(samples: samples)
-        complianceReport = s
+
+        // Gerar relatório detalhado com análise de termos
+        var detailedReport = generateDetailedComplianceReport(filteredResults, biasReport: s)
+        complianceReport = detailedReport
+
         // simple trust index heuristic: avg adherence penalized by bias
-        let avgAdh = results.map{ $0.score/100.0 }.reduce(0,+) / Double(results.count)
+        let avgAdh = filteredResults.map{ $0.score/100.0 }.reduce(0,+) / Double(filteredResults.count)
         if let d = s.data(using: .utf8),
            let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
            let bias = o["bias_score"] as? Double {
@@ -366,6 +409,84 @@ struct ContentView: View {
         } else {
             trustIndex = avgAdh
         }
+    }
+
+    private func generateDetailedComplianceReport(_ results: [ValidationRow], biasReport: String) -> String {
+        var report = "=== ANÁLISE DE COMPLIANCE ===\n\n"
+
+        // 1. Resumo dos modelos analisados
+        let totalModels = results.count
+        let successfulModels = results.filter { $0.score > 0 }
+        let failedModels = results.filter { $0.score == 0 }
+
+        report += "📊 RESUMO DOS MODELOS:\n"
+        report += "• Total analisado: \(totalModels)\n"
+        report += "• ✅ Modelos funcionais: \(successfulModels.count)\n"
+        report += "• ❌ Modelos com erro: \(failedModels.count)\n\n"
+
+        // 2. Análise de termos das diretrizes
+        report += "📋 ANÁLISE DE TERMOS DAS DIRETRIZES:\n"
+        report += "   (Mostra quais modelos mencionaram os termos de cada tópico)\n\n"
+
+        if useCustomGuidelines, let guidelinesData = customGuidelines.data(using: .utf8),
+           let guidelinesArray = try? JSONSerialization.jsonObject(with: guidelinesData) as? [[String: Any]] {
+
+            // Analisar diretrizes customizadas
+            for (index, guideline) in guidelinesArray.enumerated() {
+                if let topic = guideline["topic"] as? String,
+                   let expectedTerms = guideline["expected_terms"] as? [String] {
+
+                    report += "\n📌 TÓPICO: \(topic)\n"
+                    report += "Termos esperados (\(expectedTerms.count)): \(expectedTerms.joined(separator: ", "))\n"
+
+                    // Verificar quais modelos mencionaram os termos deste tópico
+                    var topicCompliance: [String: Bool] = [:]
+                    for result in results where result.score > 0 {
+                        let responseLower = result.response.lowercased()
+                        let termsFound = expectedTerms.filter { responseLower.contains($0.lowercased()) }
+                        topicCompliance[result.provider] = !termsFound.isEmpty
+                    }
+
+                    report += "Modelos que mencionaram termos deste tópico:\n"
+                    for (provider, mentioned) in topicCompliance {
+                        let status = mentioned ? "✅" : "❌"
+                        report += "  \(status) \(provider)\n"
+                    }
+                }
+            }
+        } else {
+            // Analisar diretrizes ANVISA padrão
+            let anvisaTerms = [
+                "Segurança em medicamentos": ["contraindicação", "interação medicamentosa", "efeitos adversos", "posologia", "advertências", "cuidados especiais", "monitoramento", "orientação médica"],
+                "Informações técnicas": ["princípio ativo", "mecanismo de ação", "farmacocinética", "farmacodinâmica", "biodisponibilidade", "meia-vida", "clearance", "volume de distribuição"],
+                "Aspectos regulatórios": ["ANVISA", "registro", "autorização", "normas técnicas", "farmacovigilância", "estudos clínicos", "evidências científicas", "conformidade regulatória"]
+            ]
+
+            for (topic, terms) in anvisaTerms {
+                report += "\n📌 TÓPICO: \(topic)\n"
+                report += "Termos esperados (\(terms.count)): \(terms.joined(separator: ", "))\n"
+
+                // Verificar quais modelos mencionaram os termos deste tópico
+                var topicCompliance: [String: Bool] = [:]
+                for result in results where result.score > 0 {
+                    let responseLower = result.response.lowercased()
+                    let termsFound = terms.filter { responseLower.contains($0.lowercased()) }
+                    topicCompliance[result.provider] = !termsFound.isEmpty
+                }
+
+                report += "Modelos que mencionaram termos deste tópico:\n"
+                for (provider, mentioned) in topicCompliance {
+                    let status = mentioned ? "✅" : "❌"
+                    report += "  \(status) \(provider)\n"
+                }
+            }
+        }
+
+        // 3. Adicionar relatório de bias original
+        report += "\n=== RELATÓRIO DE BIAS ===\n"
+        report += biasReport
+
+        return report
     }
 
     private func loadGuidelinesFromURL() {
@@ -455,7 +576,7 @@ struct ContentView: View {
     private func getActiveProviders() -> [String] {
         var providers: [String] = []
 
-        // No modo Multi, mostrar todos os modelos LLM que serão testados
+        // No modo Multi, mostrar apenas os modelos LLM que serão testados
         if mode == .multi {
             // OpenAI - se tem chave, mostrar todos os modelos que serão testados
             if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -493,11 +614,9 @@ struct ContentView: View {
             }
         }
 
-        // Incluir ANVISA APENAS se não estiver usando diretrizes customizadas
-        // ANVISA é um conjunto de diretrizes, não um modelo LLM
-        if !useCustomGuidelines {
-            providers.append("ANVISA (Default)")
-        }
+        // ANVISA é diretrizes (guidelines), não um modelo LLM - não incluir na lista de providers
+        // ANVISA será usado internamente como guidelines quando toggle estiver OFF
+        // ANVISA funciona como um arquivo JSON de diretrizes padrão, não como um provider
 
         return providers
     }

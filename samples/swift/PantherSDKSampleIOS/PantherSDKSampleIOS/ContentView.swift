@@ -261,7 +261,6 @@ struct ContentView: View {
                 case .openai: output = callOpenAI(prompt: prompt, apiKey: apiKey, model: openAIModel, base: openAIBase)
                 case .ollama: output = callOllama(prompt: prompt, base: ollamaBase, model: ollamaModel)
                 case .anthropic:
-                    // Use multi path with single entry
                     let arr: [[String: String]] = [["type": "anthropic", "api_key": anthropicKey, "model": anthropicModel, "base_url": anthropicBase]]
                     let data = try? JSONSerialization.data(withJSONObject: arr)
                     let singleJSON = String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
@@ -283,28 +282,23 @@ struct ContentView: View {
     private func buildProvidersJSON() -> String {
         var arr: [[String: String]] = []
 
-        // No modo Multi, incluir todos os provedores LLM disponíveis com todos os seus modelos
         if mode == .multi {
-            // OpenAI - se tem chave, testar todos os modelos disponíveis
             if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 for model in CostRules.openAIModels {
                     arr.append(["type": "openai", "api_key": apiKey, "model": model, "base_url": openAIBase])
                 }
             }
 
-            // Ollama - sempre disponível, testar todos os modelos
             for model in CostRules.ollamaModels {
                 arr.append(["type": "ollama", "model": model, "base_url": ollamaBase])
             }
 
-            // Anthropic - se tem chave, testar todos os modelos disponíveis
             if !anthropicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 for model in CostRules.anthropicModels {
                     arr.append(["type": "anthropic", "api_key": anthropicKey, "model": model, "base_url": anthropicBase])
                 }
             }
         } else {
-            // Modo Single - usar apenas o provedor selecionado
             switch provider {
             case .openai:
                 arr.append(["type": "openai", "api_key": apiKey, "model": openAIModel, "base_url": openAIBase])
@@ -317,9 +311,6 @@ struct ContentView: View {
             }
         }
 
-        // Incluir ANVISA APENAS se não estiver usando diretrizes customizadas
-        // ANVISA é um conjunto de diretrizes (guidelines), não um modelo LLM
-        // ANVISA funciona como um arquivo JSON de diretrizes padrão
         if !useCustomGuidelines {
             arr.append(["type": "default", "model": "anvisa", "base_url": ""])
         }
@@ -381,9 +372,6 @@ struct ContentView: View {
 
     // MARK: - Compliance helpers
     private func generateCompliance() {
-        // Filtrar resultados baseado na opção do usuário
-        // includeFailedModels = true: incluir todos os modelos (funcionaram + falharam)
-        // includeFailedModels = false: incluir apenas modelos que funcionaram (score > 0)
         let filteredResults = includeFailedModels ? results : results.filter { $0.score > 0 }
 
         if filteredResults.isEmpty {
@@ -392,29 +380,26 @@ struct ContentView: View {
             return
         }
 
-        // bias over filtered responses
+        // Usar bias detection do backend
         let samples = filteredResults.map { $0.response }
-        let s = PantherBridge.biasDetect(samples: samples)
+        let biasReport = PantherBridge.biasDetect(samples: samples)
 
-        // Gerar relatório detalhado com análise de termos
-        var detailedReport = generateDetailedComplianceReport(filteredResults, biasReport: s)
-        complianceReport = detailedReport
+        // Gerar relatório detalhado
+        var report = generateComplianceReport(filteredResults, biasReport: biasReport)
+        complianceReport = report
 
-        // simple trust index heuristic: avg adherence penalized by bias
+        // trust index baseado no bias
         let avgAdh = filteredResults.map{ $0.score/100.0 }.reduce(0,+) / Double(filteredResults.count)
-        if let d = s.data(using: .utf8),
-           let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
-           let bias = o["bias_score"] as? Double {
-            trustIndex = max(0, min(1, avgAdh * (1.0 - bias)))
+        if let biasScore = extractBiasScore(biasReport) {
+            trustIndex = max(0, min(1, avgAdh * (1.0 - biasScore)))
         } else {
             trustIndex = avgAdh
         }
     }
 
-    private func generateDetailedComplianceReport(_ results: [ValidationRow], biasReport: String) -> String {
+    private func generateComplianceReport(_ results: [ValidationRow], biasReport: String) -> String {
         var report = "=== ANÁLISE DE COMPLIANCE ===\n\n"
 
-        // 1. Resumo dos modelos analisados
         let totalModels = results.count
         let successfulModels = results.filter { $0.score > 0 }
         let failedModels = results.filter { $0.score == 0 }
@@ -424,22 +409,19 @@ struct ContentView: View {
         report += "• ✅ Modelos funcionais: \(successfulModels.count)\n"
         report += "• ❌ Modelos com erro: \(failedModels.count)\n\n"
 
-        // 2. Análise de termos das diretrizes
-        report += "📋 ANÁLISE DE TERMOS DAS DIRETRIZES:\n"
-        report += "   (Mostra quais modelos mencionaram os termos de cada tópico)\n\n"
+        // Análise de termos das diretrizes
+        report += "📋 ANÁLISE DE TERMOS DAS DIRETRIZES:\n\n"
 
-        if useCustomGuidelines, let guidelinesData = customGuidelines.data(using: .utf8),
-           let guidelinesArray = try? JSONSerialization.jsonObject(with: guidelinesData) as? [[String: Any]] {
+        if useCustomGuidelines, let data = customGuidelines.data(using: .utf8),
+           let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
 
-            // Analisar diretrizes customizadas
-            for (index, guideline) in guidelinesArray.enumerated() {
+            for guideline in array {
                 if let topic = guideline["topic"] as? String,
                    let expectedTerms = guideline["expected_terms"] as? [String] {
 
-                    report += "\n📌 TÓPICO: \(topic)\n"
+                    report += "📌 TÓPICO: \(topic)\n"
                     report += "Termos esperados (\(expectedTerms.count)): \(expectedTerms.joined(separator: ", "))\n"
 
-                    // Verificar quais modelos mencionaram os termos deste tópico
                     var topicCompliance: [String: Bool] = [:]
                     for result in results where result.score > 0 {
                         let responseLower = result.response.lowercased()
@@ -447,15 +429,15 @@ struct ContentView: View {
                         topicCompliance[result.provider] = !termsFound.isEmpty
                     }
 
-                    report += "Modelos que mencionaram termos deste tópico:\n"
+                    report += "Modelos que mencionaram termos:\n"
                     for (provider, mentioned) in topicCompliance {
                         let status = mentioned ? "✅" : "❌"
                         report += "  \(status) \(provider)\n"
                     }
+                    report += "\n"
                 }
             }
         } else {
-            // Analisar diretrizes ANVISA padrão
             let anvisaTerms = [
                 "Segurança em medicamentos": ["contraindicação", "interação medicamentosa", "efeitos adversos", "posologia", "advertências", "cuidados especiais", "monitoramento", "orientação médica"],
                 "Informações técnicas": ["princípio ativo", "mecanismo de ação", "farmacocinética", "farmacodinâmica", "biodisponibilidade", "meia-vida", "clearance", "volume de distribuição"],
@@ -463,10 +445,9 @@ struct ContentView: View {
             ]
 
             for (topic, terms) in anvisaTerms {
-                report += "\n📌 TÓPICO: \(topic)\n"
+                report += "📌 TÓPICO: \(topic)\n"
                 report += "Termos esperados (\(terms.count)): \(terms.joined(separator: ", "))\n"
 
-                // Verificar quais modelos mencionaram os termos deste tópico
                 var topicCompliance: [String: Bool] = [:]
                 for result in results where result.score > 0 {
                     let responseLower = result.response.lowercased()
@@ -474,19 +455,28 @@ struct ContentView: View {
                     topicCompliance[result.provider] = !termsFound.isEmpty
                 }
 
-                report += "Modelos que mencionaram termos deste tópico:\n"
+                report += "Modelos que mencionaram termos:\n"
                 for (provider, mentioned) in topicCompliance {
                     let status = mentioned ? "✅" : "❌"
                     report += "  \(status) \(provider)\n"
                 }
+                report += "\n"
             }
         }
 
-        // 3. Adicionar relatório de bias original
-        report += "\n=== RELATÓRIO DE BIAS ===\n"
+        report += "=== RELATÓRIO DE BIAS ===\n"
         report += biasReport
 
         return report
+    }
+
+    private func extractBiasScore(_ biasReport: String) -> Double? {
+        if let data = biasReport.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let biasScore = json["bias_score"] as? Double {
+            return biasScore
+        }
+        return nil
     }
 
     private func loadGuidelinesFromURL() {
@@ -576,28 +566,23 @@ struct ContentView: View {
     private func getActiveProviders() -> [String] {
         var providers: [String] = []
 
-        // No modo Multi, mostrar apenas os modelos LLM que serão testados
         if mode == .multi {
-            // OpenAI - se tem chave, mostrar todos os modelos que serão testados
             if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 for model in CostRules.openAIModels {
                     providers.append("OpenAI (\(model))")
                 }
             }
 
-            // Ollama - sempre disponível, mostrar todos os modelos
             for model in CostRules.ollamaModels {
                 providers.append("Ollama (\(model))")
             }
 
-            // Anthropic - se tem chave, mostrar todos os modelos
             if !anthropicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 for model in CostRules.anthropicModels {
                     providers.append("Anthropic (\(model))")
                 }
             }
         } else {
-            // Modo Single - mostrar apenas o modelo selecionado
             switch provider {
             case .openai:
                 if !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -613,10 +598,6 @@ struct ContentView: View {
                 break
             }
         }
-
-        // ANVISA é diretrizes (guidelines), não um modelo LLM - não incluir na lista de providers
-        // ANVISA será usado internamente como guidelines quando toggle estiver OFF
-        // ANVISA funciona como um arquivo JSON de diretrizes padrão, não como um provider
 
         return providers
     }

@@ -42,6 +42,33 @@ enum PantherBridge {
         return json.withCString { j in strPtr(panther_bias_detect(j)) }
     }
 
+    // MARK: - Metrics API
+    static func metricsBLEU(reference: String, candidate: String) -> Double {
+        reference.withCString { r in candidate.withCString { c in panther_metrics_bleu(r, c) } }
+    }
+
+    static func metricsROUGEL(reference: String, candidate: String) -> Double {
+        reference.withCString { r in candidate.withCString { c in panther_metrics_rouge_l(r, c) } }
+    }
+
+    static func metricsCoherence(text: String) -> Double {
+        text.withCString { t in panther_metrics_coherence(t) }
+    }
+
+    static func metricsFluency(text: String) -> Double {
+        text.withCString { t in panther_metrics_fluency(t) }
+    }
+
+    static func metricsAccuracy(expected: String, generated: String) -> Double {
+        expected.withCString { e in generated.withCString { g in panther_metrics_accuracy(e, g) } }
+    }
+
+    static func metricsDiversity(samples: [String]) -> Double {
+        guard let data = try? JSONSerialization.data(withJSONObject: samples),
+              let json = String(data: data, encoding: .utf8) else { return 0.0 }
+        return json.withCString { j in panther_metrics_diversity(j) }
+    }
+
     static func loadGuidelinesFromURL(_ url: String, completion: @escaping (String?) -> Void) {
         guard let u = URL(string: url) else { completion(nil); return }
         URLSession.shared.dataTask(with: u) { data, _, _ in
@@ -109,3 +136,16 @@ private func panther_validation_run_custom_with_proof(_ prompt: UnsafePointer<CC
 @_silgen_name("panther_bias_detect")
 private func panther_bias_detect(_ samplesJson: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
 
+// MARK: - Metrics C symbols
+@_silgen_name("panther_metrics_bleu")
+private func panther_metrics_bleu(_ reference: UnsafePointer<CChar>, _ candidate: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_rouge_l")
+private func panther_metrics_rouge_l(_ reference: UnsafePointer<CChar>, _ candidate: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_coherence")
+private func panther_metrics_coherence(_ text: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_fluency")
+private func panther_metrics_fluency(_ text: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_accuracy")
+private func panther_metrics_accuracy(_ expected: UnsafePointer<CChar>, _ generated: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_diversity")
+private func panther_metrics_diversity(_ samplesJson: UnsafePointer<CChar>) -> Double

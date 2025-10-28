@@ -19,7 +19,6 @@ struct ContentView: View {
     @State private var anthropicModel: String = "claude-3-5-sonnet-latest"
     @State private var anthropicKey: String = ""
 
-    @State private var useCustomGuidelines: Bool = false
     @State private var customGuidelines: String = ""
 
     @State private var showCostRules: Bool = false
@@ -36,6 +35,10 @@ struct ContentView: View {
     @State private var guidelinesURL: String = ""
     @State private var proofApiBase: String = "http://127.0.0.1:8000"
     @State private var lastAnchorResponse: String = ""
+    // Neutral reference used for BLEU comparison (content validation)
+    @State private var neutralReference: String = "O uso de medicamentos na gravidez deve ser baseado em avaliação risco‑benefício individualizada por profissional habilitado. Priorizar fármacos com histórico de segurança e categoria de risco favorável, evitando agentes potencialmente teratogênicos. Considerar o princípio ativo e seu mecanismo de ação, bem como alterações farmacocinéticas da gestação para ajuste de posologia. Verificar contraindicações, advertências, interações medicamentosas e possíveis efeitos adversos, com monitoramento clínico adequado. Seguir as normas e orientações da ANVISA e da literatura atualizada. Orientar a paciente a não realizar automedicação e a buscar acompanhamento médico para qualquer dúvida ou sintoma."
+    @State private var bleuWeight: Double = 0.3
+    @State private var bleuThreshold: Double = 70.0
 
     var body: some View {
         NavigationView {
@@ -54,7 +57,12 @@ struct ContentView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    if mode == .multi {
+                    if mode == .single {
+                        Picker("Provider", selection: $provider) {
+                            ForEach(Provider.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                    } else {
                         SectionHeader("Providers a serem testados")
                         let activeProviders = getActiveProviders()
                         if activeProviders.isEmpty {
@@ -71,61 +79,39 @@ struct ContentView: View {
                                 }
                             }
                         }
-                    } else {
-                        Picker("Provider", selection: $provider) {
-                            ForEach(Provider.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
                     }
 
-                    Group {
-                        if provider == .openai {
-                            TextField("OpenAI API Key", text: $apiKey)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                                .textFieldStyle(.roundedBorder)
-                            TextField("Base URL", text: $openAIBase)
-                                .textFieldStyle(.roundedBorder)
-                            ModelPicker(title: "Model", presets: CostRules.openAIModels, selection: $openAIModel)
-                        } else if provider == .ollama {
-                            TextField("Ollama Base (http://127.0.0.1:11434)", text: $ollamaBase)
-                                .textFieldStyle(.roundedBorder)
-                            ModelPicker(title: "Model", presets: CostRules.ollamaModels, selection: $ollamaModel)
-                        } else if provider == .anthropic {
-                            TextField("Anthropic API Key", text: $anthropicKey)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                                .textFieldStyle(.roundedBorder)
-                            TextField("Base URL (https://api.anthropic.com)", text: $anthropicBase)
-                                .textFieldStyle(.roundedBorder)
-                            ModelPicker(title: "Model", presets: CostRules.anthropicModels, selection: $anthropicModel)
-                        } else {
-                            Text("Usando providers de ambiente (Default)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                    if mode == .single {
+                        Group {
+                            if provider == .openai {
+                                TextField("OpenAI API Key", text: $apiKey)
+                                    .textInputAutocapitalization(.never)
+                                    .disableAutocorrection(true)
+                                    .textFieldStyle(.roundedBorder)
+                                TextField("Base URL", text: $openAIBase)
+                                    .textFieldStyle(.roundedBorder)
+                                ModelPicker(title: "Model", presets: CostRules.openAIModels, selection: $openAIModel)
+                            } else if provider == .ollama {
+                                TextField("Ollama Base (http://127.0.0.1:11434)", text: $ollamaBase)
+                                    .textFieldStyle(.roundedBorder)
+                                ModelPicker(title: "Model", presets: CostRules.ollamaModels, selection: $ollamaModel)
+                            } else if provider == .anthropic {
+                                TextField("Anthropic API Key", text: $anthropicKey)
+                                    .textInputAutocapitalization(.never)
+                                    .disableAutocorrection(true)
+                                    .textFieldStyle(.roundedBorder)
+                                TextField("Base URL (https://api.anthropic.com)", text: $anthropicBase)
+                                    .textFieldStyle(.roundedBorder)
+                                ModelPicker(title: "Model", presets: CostRules.anthropicModels, selection: $anthropicModel)
+                            } else {
+                                Text("Usando providers de ambiente (Default)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
 
-                    SectionHeader("Diretrizes")
-                    Toggle("Usar diretrizes customizadas (JSON)", isOn: $useCustomGuidelines)
-                    if useCustomGuidelines {
-                        TextEditor(text: $customGuidelines)
-                            .frame(minHeight: 90)
-                            .padding(8)
-                            .background(Color(.secondarySystemBackground))
-                            .cornerRadius(8)
-                            .font(.caption)
-
-                        Button("Preencher com exemplo") {
-                            customGuidelines = getExampleGuidelines()
-                        }
-                        .buttonStyle(.bordered)
-                        .padding(.top, 4)
-                    } else {
-                        Text("ANVISA (diretrizes padrão)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    // Diretrizes: carregue por URL na seção abaixo
 
                     HStack {
                         SectionHeader("Custos (estimativa)")
@@ -144,7 +130,7 @@ struct ContentView: View {
                     if !results.isEmpty {
                         SectionHeader("Resultados")
                         SummaryView(rows: results)
-                        ForEach(results) { row in ResultCard(row: row) }
+                        ForEach(results) { row in ResultCard(row: row, bleuWeight: bleuWeight, bleuThreshold: bleuThreshold) }
                     }
 
                     if let proof = proofJSON, mode == .proof {
@@ -155,7 +141,6 @@ struct ContentView: View {
                             .background(Color(.secondarySystemBackground))
                             .cornerRadius(8)
 
-                        // Anchor proof via API
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Anchor proof (Python API)").font(.subheadline).fontWeight(.semibold)
                             TextField("API Base (ex.: http://127.0.0.1:8000)", text: $proofApiBase).textFieldStyle(.roundedBorder)
@@ -174,20 +159,39 @@ struct ContentView: View {
                         .padding(.top, 4)
                     }
 
-                    // Compliance: bias/trust index
                     if !results.isEmpty {
                         SectionHeader("Compliance Report")
                         HStack {
                             Button("Gerar Compliance") { generateCompliance() }
                             Spacer()
-                            // Toggle para incluir/excluir modelos com erro
                             Toggle("Incluir modelos com erro", isOn: $includeFailedModels)
                                 .toggleStyle(.switch)
                                 .font(.caption)
                         }
+                        Text("Neutral Reference (BLEU)").font(.caption).foregroundColor(.secondary)
+                        TextEditor(text: $neutralReference)
+                            .frame(minHeight: 80)
+                            .padding(8)
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(8)
+
+                        Text("Dica: separe múltiplas referências por linha em branco — usamos o melhor BLEU.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text("Peso BLEU: \(Int(bleuWeight*100))%")
+                                    .font(.caption)
+                                Slider(value: $bleuWeight, in: 0...1, step: 0.05)
+                            }
+                            VStack(alignment: .leading) {
+                                Text("Limiar BLEU: \(Int(bleuThreshold))")
+                                    .font(.caption)
+                                Slider(value: $bleuThreshold, in: 0...100, step: 5)
+                            }
+                        }
 
                         if !complianceReport.isEmpty {
-                            // Mostrar estatísticas dos modelos
                             let successfulModels = results.filter { $0.score > 0 }
                             let failedModels = results.filter { $0.score == 0 }
 
@@ -202,9 +206,18 @@ struct ContentView: View {
                             }
                             .padding(.vertical, 4)
 
-                            Text("Trust Index: \(String(format: "%.1f", trustIndex*100))%")
+                            Text("Compliance (Adherence média): \(String(format: "%.1f", trustIndex*100))%")
                                 .font(.subheadline)
                                 .foregroundColor(trustIndex >= 0.8 ? .green : (trustIndex >= 0.6 ? .orange : .red))
+
+                            let filtered = includeFailedModels ? results : results.filter { $0.score > 0 }
+                            let avgQuality: Double = {
+                                let vals = filtered.map { (1.0 - bleuWeight) * $0.score + bleuWeight * ($0.bleu ?? 0.0) }
+                                return vals.isEmpty ? 0.0 : (vals.reduce(0,+) / Double(vals.count))
+                            }()
+                            Text("Qualidade (Adh + BLEU): \(String(format: "%.1f", avgQuality))%")
+                                .font(.subheadline)
+                                .foregroundColor(avgQuality >= 80 ? .green : (avgQuality >= 60 ? .orange : .red))
 
                             TextEditor(text: $complianceReport)
                                 .font(.system(.footnote, design: .monospaced))
@@ -212,11 +225,9 @@ struct ContentView: View {
                                 .padding(8)
                                 .background(Color(.secondarySystemBackground))
                                 .cornerRadius(8)
-                                .disabled(false)  // Permitir edição
                         }
                     }
 
-                    // Load Guidelines from URL helper
                     SectionHeader("Carregar Diretrizes por URL")
                     HStack {
                         TextField("https://…/guidelines.json", text: $guidelinesURL)
@@ -311,9 +322,7 @@ struct ContentView: View {
             }
         }
 
-        if !useCustomGuidelines {
-            arr.append(["type": "default", "model": "anvisa", "base_url": ""])
-        }
+        // Não incluir diretrizes padrão (ANVISA). Use apenas quando customGuidelines for carregado.
 
         let data = try? JSONSerialization.data(withJSONObject: arr)
         return String(data: data ?? Data("[]".utf8), encoding: .utf8) ?? "[]"
@@ -343,7 +352,10 @@ struct ContentView: View {
             let text = r["raw_text"] as? String ?? ""
             let tokensOut = PantherBridge.tokenCount(text)
             let cost = PantherBridge.calculateCost(tokensIn: tokensIn, tokensOut: tokensOut, provider: name, rules: rules)
-            return ValidationRow(provider: name, score: score, latencyMs: lat, tokensIn: tokensIn, tokensOut: tokensOut, costUSD: cost, response: text)
+            // Compute BLEU vs neutral reference(s) if provided
+            let ref = neutralReference.trimmingCharacters(in: .whitespacesAndNewlines)
+            let bleuPct: Double? = ref.isEmpty ? nil : computeBLEUPercent(refsText: ref, candidate: text)
+            return ValidationRow(provider: name, score: score, bleu: bleuPct, latencyMs: lat, tokensIn: tokensIn, tokensOut: tokensOut, costUSD: cost, response: text)
         }.sorted { $0.score > $1.score }
     }
 
@@ -362,7 +374,8 @@ struct ContentView: View {
         return PantherBridge.validateOllama(prompt: prompt, base: base, model: model)
     }
     private func callMulti(prompt: String, providersJSON: String, withProof: Bool) -> String {
-        if useCustomGuidelines, let data = customGuidelines.data(using: .utf8), (try? JSONSerialization.jsonObject(with: data)) is Any {
+        if !customGuidelines.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let data = customGuidelines.data(using: .utf8), (try? JSONSerialization.jsonObject(with: data)) is Any {
             return withProof ? PantherBridge.validateCustomWithProof(prompt: prompt, providersJSON: providersJSON, guidelinesJSON: customGuidelines)
                              : PantherBridge.validateCustom(prompt: prompt, providersJSON: providersJSON, guidelinesJSON: customGuidelines)
         }
@@ -370,7 +383,6 @@ struct ContentView: View {
                          : PantherBridge.validateMulti(prompt: prompt, providersJSON: providersJSON)
     }
 
-    // MARK: - Compliance helpers
     private func generateCompliance() {
         let filteredResults = includeFailedModels ? results : results.filter { $0.score > 0 }
 
@@ -380,111 +392,134 @@ struct ContentView: View {
             return
         }
 
-        // Usar bias detection do backend
-        let samples = filteredResults.map { $0.response }
-        let biasReport = PantherBridge.biasDetect(samples: samples)
-
-        // Gerar relatório detalhado
-        var report = generateComplianceReport(filteredResults, biasReport: biasReport)
-        complianceReport = report
-
-        // trust index baseado no bias
-        let avgAdh = filteredResults.map{ $0.score/100.0 }.reduce(0,+) / Double(filteredResults.count)
-        if let biasScore = extractBiasScore(biasReport) {
-            trustIndex = max(0, min(1, avgAdh * (1.0 - biasScore)))
-        } else {
-            trustIndex = avgAdh
+        // Recompute BLEU for current neutral reference (if provided)
+        let ref = neutralReference.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !ref.isEmpty {
+            results = results.map { row in
+                let b = computeBLEUPercent(refsText: ref, candidate: row.response)
+                return ValidationRow(provider: row.provider, score: row.score, bleu: b, latencyMs: row.latencyMs, tokensIn: row.tokensIn, tokensOut: row.tokensOut, costUSD: row.costUSD, response: row.response)
+            }
+        } else if let best = results.max(by: { $0.score < $1.score }) {
+            // Fallback: Relative BLEU using the best adherence response as reference
+            let autoRef = best.response
+            results = results.map { row in
+                let b = computeBLEUPercent(refsText: autoRef, candidate: row.response)
+                return ValidationRow(provider: row.provider, score: row.score, bleu: b, latencyMs: row.latencyMs, tokensIn: row.tokensIn, tokensOut: row.tokensOut, costUSD: row.costUSD, response: row.response)
+            }
         }
-    }
 
-    private func generateComplianceReport(_ results: [ValidationRow], biasReport: String) -> String {
+        // Focus on adherence metrics in the textual report
+
         var report = "=== ANÁLISE DE COMPLIANCE ===\n\n"
-
-        let totalModels = results.count
-        let successfulModels = results.filter { $0.score > 0 }
-        let failedModels = results.filter { $0.score == 0 }
-
         report += "📊 RESUMO DOS MODELOS:\n"
-        report += "• Total analisado: \(totalModels)\n"
-        report += "• ✅ Modelos funcionais: \(successfulModels.count)\n"
-        report += "• ❌ Modelos com erro: \(failedModels.count)\n\n"
+        report += "• Total: \(results.count)\n"
+        report += "• ✅ Funcionais: \(filteredResults.count)\n"
+        report += "• ❌ Com erro: \(results.count - filteredResults.count)\n\n"
 
-        // Análise de termos das diretrizes
-        report += "📋 ANÁLISE DE TERMOS DAS DIRETRIZES:\n\n"
+        report += "📋 ANÁLISE DE TERMOS:\n\n"
 
-        if useCustomGuidelines, let data = customGuidelines.data(using: .utf8),
+        if !customGuidelines.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let data = customGuidelines.data(using: .utf8),
            let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
 
             for guideline in array {
                 if let topic = guideline["topic"] as? String,
                    let expectedTerms = guideline["expected_terms"] as? [String] {
 
-                    report += "📌 TÓPICO: \(topic)\n"
-                    report += "Termos esperados (\(expectedTerms.count)): \(expectedTerms.joined(separator: ", "))\n"
+                    report += "📌 \(topic) (\(expectedTerms.count) termos):\n"
+                    report += "   \(expectedTerms.joined(separator: ", "))\n"
 
-                    var topicCompliance: [String: Bool] = [:]
-                    for result in results where result.score > 0 {
+                    for result in filteredResults {
                         let responseLower = result.response.lowercased()
                         let termsFound = expectedTerms.filter { responseLower.contains($0.lowercased()) }
-                        topicCompliance[result.provider] = !termsFound.isEmpty
-                    }
-
-                    report += "Modelos que mencionaram termos:\n"
-                    for (provider, mentioned) in topicCompliance {
-                        let status = mentioned ? "✅" : "❌"
-                        report += "  \(status) \(provider)\n"
+                        let status = !termsFound.isEmpty ? "✅" : "❌"
+                        report += "   \(status) \(result.provider)\n"
                     }
                     report += "\n"
                 }
             }
         } else {
-            let anvisaTerms = [
-                "Segurança em medicamentos": ["contraindicação", "interação medicamentosa", "efeitos adversos", "posologia", "advertências", "cuidados especiais", "monitoramento", "orientação médica"],
-                "Informações técnicas": ["princípio ativo", "mecanismo de ação", "farmacocinética", "farmacodinâmica", "biodisponibilidade", "meia-vida", "clearance", "volume de distribuição"],
-                "Aspectos regulatórios": ["ANVISA", "registro", "autorização", "normas técnicas", "farmacovigilância", "estudos clínicos", "evidências científicas", "conformidade regulatória"]
-            ]
-
-            for (topic, terms) in anvisaTerms {
-                report += "📌 TÓPICO: \(topic)\n"
-                report += "Termos esperados (\(terms.count)): \(terms.joined(separator: ", "))\n"
-
-                var topicCompliance: [String: Bool] = [:]
-                for result in results where result.score > 0 {
+            // Sem diretrizes: derive termos da Neutral Reference (se disponível)
+            let ref = neutralReference.trimmingCharacters(in: .whitespacesAndNewlines)
+            let derived = deriveKeyTerms(from: ref, maxTerms: 10)
+            if !derived.isEmpty {
+                report += "(Sem diretriz por URL) – Usando termos derivados da referência neutra.\n\n"
+                report += "📌 Termos (\(derived.count)):\n"
+                report += "   \(derived.joined(separator: ", "))\n"
+                for result in filteredResults {
                     let responseLower = result.response.lowercased()
-                    let termsFound = terms.filter { responseLower.contains($0.lowercased()) }
-                    topicCompliance[result.provider] = !termsFound.isEmpty
+                    let covered = derived.filter { responseLower.contains($0.lowercased()) }
+                    let status = covered.isEmpty ? "❌" : "✅"
+                    let covTxt = covered.isEmpty ? "(nenhum)" : covered.joined(separator: ", ")
+                    report += "   \(status) \(result.provider) – cobre: \(covTxt)\n"
                 }
-
-                report += "Modelos que mencionaram termos:\n"
-                for (provider, mentioned) in topicCompliance {
-                    let status = mentioned ? "✅" : "❌"
-                    report += "  \(status) \(provider)\n"
+                // Ranking por cobertura de termos
+                let ranked = filteredResults.map { r -> (String, Int) in
+                    let low = r.response.lowercased()
+                    let c = derived.filter { low.contains($0.lowercased()) }.count
+                    return (r.provider, c)
+                }.sorted { $0.1 > $1.1 }
+                if !ranked.isEmpty {
+                    report += "\n🏆 Cobertura por termos (Top):\n"
+                    for (i, item) in ranked.prefix(3).enumerated() {
+                        report += "   \(i+1). \(item.0) – \(item.1)/\(derived.count) termos\n"
+                    }
                 }
                 report += "\n"
+            } else {
+                report += "(Nenhuma diretriz carregada)\n"
+                report += "Use \"Carregar Diretrizes por URL\" para habilitar a checagem de termos.\n\n"
             }
         }
 
-        report += "=== RELATÓRIO DE BIAS ===\n"
-        report += biasReport
+        // BLEU is displayed at the result level; report focuses on adherence terms.
 
-        return report
+        complianceReport = report
+
+        let avgAdh = filteredResults.map{ $0.score/100.0 }.reduce(0,+) / Double(filteredResults.count)
+        trustIndex = avgAdh
     }
 
-    private func extractBiasScore(_ biasReport: String) -> Double? {
-        if let data = biasReport.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let biasScore = json["bias_score"] as? Double {
-            return biasScore
+    private func computeBLEUPercent(refsText: String, candidate: String) -> Double {
+        let norm = refsText.replacingOccurrences(of: "\r\n", with: "\n")
+        let blocks = norm.components(separatedBy: "\n\n").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        if blocks.isEmpty {
+            let v = PantherBridge.metricsBLEU(reference: norm, candidate: candidate)
+            return v > 1.0 ? min(v, 100.0) : (v * 100.0)
         }
-        return nil
+        var best: Double = 0.0
+        for ref in blocks {
+            let v = PantherBridge.metricsBLEU(reference: ref, candidate: candidate)
+            let pct = v > 1.0 ? min(v, 100.0) : (v * 100.0)
+            if pct > best { best = pct }
+        }
+        return best
     }
+
+    // Deriva termos-chave de uma referência neutra quando não há diretrizes carregadas
+    private func deriveKeyTerms(from ref: String, maxTerms: Int) -> [String] {
+        let trimmed = ref.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        let stop: Set<String> = [
+            "a","o","as","os","de","da","do","das","dos","e","em","para","por","com","uma","um","na","no","nas","nos","ou","que","se","ao","à","às","aos","entre","sobre","como","pela","pelo","pelas","pelos","mais","menos","contra","pode","devem","deve","ser","são","é","foi","sua","seu","suas","seus","quando","onde","qual","quais","também","bem","há"
+        ]
+        let tokens = trimmed
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count >= 5 && !stop.contains($0) }
+        var freq: [String:Int] = [:]
+        for t in tokens { freq[t, default: 0] += 1 }
+        let sorted = freq.keys.sorted { (freq[$0] ?? 0) > (freq[$1] ?? 0) }
+        return Array(sorted.prefix(maxTerms))
+    }
+
+    // Removed bias score extraction; sample now focuses on content adherence only
 
     private func loadGuidelinesFromURL() {
         PantherBridge.loadGuidelinesFromURL(guidelinesURL) { s in
             guard let s else { return }
             DispatchQueue.main.async {
                 self.customGuidelines = s
-                self.useCustomGuidelines = true
             }
         }
     }
@@ -512,56 +547,7 @@ struct ContentView: View {
         }
     }
 
-    private func getExampleGuidelines() -> String {
-        let exampleGuidelines = [
-            [
-                "topic": "Segurança em medicamentos",
-                "expected_terms": [
-                    "contraindicação",
-                    "interação medicamentosa",
-                    "efeitos adversos",
-                    "posologia",
-                    "advertências",
-                    "cuidados especiais",
-                    "monitoramento",
-                    "orientação médica"
-                ]
-            ],
-            [
-                "topic": "Informações técnicas",
-                "expected_terms": [
-                    "princípio ativo",
-                    "mecanismo de ação",
-                    "farmacocinética",
-                    "farmacodinâmica",
-                    "biodisponibilidade",
-                    "meia-vida",
-                    "clearance",
-                    "volume de distribuição"
-                ]
-            ],
-            [
-                "topic": "Aspectos regulatórios",
-                "expected_terms": [
-                    "ANVISA",
-                    "registro",
-                    "autorização",
-                    "normas técnicas",
-                    "farmacovigilância",
-                    "estudos clínicos",
-                    "evidências científicas",
-                    "conformidade regulatória"
-                ]
-            ]
-        ]
-
-        if let jsonData = try? JSONSerialization.data(withJSONObject: exampleGuidelines, options: [.prettyPrinted]),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            return jsonString
-        }
-
-        return "[]"
-    }
+    // Removido exemplo embutido de diretrizes; usar carregamento por URL
 
     private func getActiveProviders() -> [String] {
         var providers: [String] = []

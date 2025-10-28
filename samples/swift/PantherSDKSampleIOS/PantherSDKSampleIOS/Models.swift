@@ -4,6 +4,7 @@ struct ValidationRow: Identifiable {
     let id = UUID()
     let provider: String
     let score: Double
+    let bleu: Double?
     let latencyMs: Int
     let tokensIn: Int
     let tokensOut: Int

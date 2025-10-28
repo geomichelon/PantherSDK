@@ -190,6 +190,25 @@ pub extern "C" fn panther_bias_detect(samples_json: *const c_char) -> *mut std::
     }
 }
 
+#[no_mangle]
+pub extern "C" fn panther_bias_detect_neutral_bleu(
+    samples_json: *const c_char,
+    neutral_reference: *const c_char,
+    weight_dispersion: f64,
+) -> *mut std::os::raw::c_char {
+    let s = unsafe { CStr::from_ptr(samples_json).to_string_lossy().into_owned() };
+    let r = unsafe { CStr::from_ptr(neutral_reference).to_string_lossy().into_owned() };
+    let parsed: Result<Vec<String>, _> = serde_json::from_str(&s);
+    match parsed {
+        Ok(v) => {
+            if let Some(buf) = LOGS.get() { let _ = buf.lock().map(|mut v| v.push("bias_detect_neutral_bleu".to_string())); }
+            let rep = panthersdk::domain::bias::detect_bias_combined_with_neutral(&v, &r, weight_dispersion);
+            rust_string_to_c(serde_json::to_string(&rep).unwrap_or_else(|_| "{}".to_string()))
+        }
+        Err(e) => rust_string_to_c(format!("{{\"error\":\"{}\"}}", e)),
+    }
+}
+
 // ---------- Storage FFI ----------
 #[no_mangle]
 pub extern "C" fn panther_storage_save_metric(name: *const c_char, value: f64, timestamp_ms: i64) -> i32 {

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 enum PantherBridge {
     // MARK: - Public API
@@ -40,6 +41,84 @@ enum PantherBridge {
         guard let data = try? JSONSerialization.data(withJSONObject: samples),
               let json = String(data: data, encoding: .utf8) else { return "{}" }
         return json.withCString { j in strPtr(panther_bias_detect(j)) }
+    }
+
+    static func biasDetectNeutralBLEU(samples: [String], neutralReference: String, weightDispersion: Double = 0.5) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: samples),
+              let json = String(data: data, encoding: .utf8) else { return "{}" }
+        return json.withCString { j in neutralReference.withCString { n in
+            if let out = PantherBridge._dyn_bias_detect_neutral_bleu(j, n, weightDispersion) {
+                return strPtr(out)
+            } else {
+                // Fallback to baseline bias detection when the new symbol isn't present in the framework
+                return strPtr(panther_bias_detect(j))
+            }
+        } }
+    }
+
+    // Dynamic lookup to avoid link errors when the framework doesn't yet export the new symbol
+    private static func _dyn_bias_detect_neutral_bleu(
+        _ samplesJson: UnsafePointer<CChar>,
+        _ neutralReference: UnsafePointer<CChar>,
+        _ weightDispersion: Double
+    ) -> UnsafeMutablePointer<CChar>? {
+        typealias Fn = @convention(c) (UnsafePointer<CChar>, UnsafePointer<CChar>, Double) -> UnsafeMutablePointer<CChar>?
+        // Use RTLD_DEFAULT to search all loaded images for the symbol
+        let handle = UnsafeMutableRawPointer(bitPattern: -2) // RTLD_DEFAULT
+        guard let sym = dlsym(handle, "panther_bias_detect_neutral_bleu") else { return nil }
+        let fn = unsafeBitCast(sym, to: Fn.self)
+        return fn(samplesJson, neutralReference, weightDispersion)
+    }
+
+    // MARK: - Metrics API
+    static func metricsBLEU(reference: String, candidate: String) -> Double {
+        reference.withCString { r in candidate.withCString { c in panther_metrics_bleu(r, c) } }
+    }
+
+    static func metricsROUGEL(reference: String, candidate: String) -> Double {
+        reference.withCString { r in candidate.withCString { c in panther_metrics_rouge_l(r, c) } }
+    }
+
+    static func metricsCoherence(text: String) -> Double {
+        text.withCString { t in panther_metrics_coherence(t) }
+    }
+
+    static func metricsFluency(text: String) -> Double {
+        text.withCString { t in panther_metrics_fluency(t) }
+    }
+
+    static func metricsAccuracy(expected: String, generated: String) -> Double {
+        expected.withCString { e in generated.withCString { g in panther_metrics_accuracy(e, g) } }
+    }
+
+    static func metricsDiversity(samples: [String]) -> Double {
+        guard let data = try? JSONSerialization.data(withJSONObject: samples),
+              let json = String(data: data, encoding: .utf8) else { return 0.0 }
+        return json.withCString { j in panther_metrics_diversity(j) }
+    }
+
+    static func metricsFactCoverage(facts: [String], candidate: String) -> Double {
+        guard let data = try? JSONSerialization.data(withJSONObject: facts),
+              let json = String(data: data, encoding: .utf8) else { return 0.0 }
+        return json.withCString { f in candidate.withCString { c in panther_metrics_fact_coverage(f, c) } }
+    }
+
+    static func metricsFactCheckAdv(facts: [String], candidate: String) -> Double {
+        guard let data = try? JSONSerialization.data(withJSONObject: facts),
+              let json = String(data: data, encoding: .utf8) else { return 0.0 }
+        return json.withCString { f in candidate.withCString { c in panther_metrics_factcheck_adv(f, c) } }
+    }
+
+    static func metricsPlagiarism(corpus: [String], candidate: String) -> Double {
+        guard let data = try? JSONSerialization.data(withJSONObject: corpus),
+              let json = String(data: data, encoding: .utf8) else { return 0.0 }
+        return json.withCString { c in candidate.withCString { ca in panther_metrics_plagiarism(c, ca) } }
+    }
+
+    static func metricsPlagiarismNgram(corpus: [String], candidate: String, ngram: Int32) -> Double {
+        guard let data = try? JSONSerialization.data(withJSONObject: corpus),
+              let json = String(data: data, encoding: .utf8) else { return 0.0 }
+        return json.withCString { c in candidate.withCString { ca in panther_metrics_plagiarism_ngram(c, ca, ngram) } }
     }
 
     static func loadGuidelinesFromURL(_ url: String, completion: @escaping (String?) -> Void) {
@@ -109,3 +188,24 @@ private func panther_validation_run_custom_with_proof(_ prompt: UnsafePointer<CC
 @_silgen_name("panther_bias_detect")
 private func panther_bias_detect(_ samplesJson: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>?
 
+// MARK: - Metrics C symbols
+@_silgen_name("panther_metrics_bleu")
+private func panther_metrics_bleu(_ reference: UnsafePointer<CChar>, _ candidate: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_rouge_l")
+private func panther_metrics_rouge_l(_ reference: UnsafePointer<CChar>, _ candidate: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_coherence")
+private func panther_metrics_coherence(_ text: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_fluency")
+private func panther_metrics_fluency(_ text: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_accuracy")
+private func panther_metrics_accuracy(_ expected: UnsafePointer<CChar>, _ generated: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_diversity")
+private func panther_metrics_diversity(_ samplesJson: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_fact_coverage")
+private func panther_metrics_fact_coverage(_ factsJson: UnsafePointer<CChar>, _ candidate: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_factcheck_adv")
+private func panther_metrics_factcheck_adv(_ factsJson: UnsafePointer<CChar>, _ candidate: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_plagiarism")
+private func panther_metrics_plagiarism(_ corpusJson: UnsafePointer<CChar>, _ candidate: UnsafePointer<CChar>) -> Double
+@_silgen_name("panther_metrics_plagiarism_ngram")
+private func panther_metrics_plagiarism_ngram(_ corpusJson: UnsafePointer<CChar>, _ candidate: UnsafePointer<CChar>, _ ngram: Int32) -> Double

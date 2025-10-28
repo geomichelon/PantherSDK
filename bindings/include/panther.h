@@ -22,6 +22,7 @@ double panther_metrics_plagiarism_ngram(const char* corpus_json, const char* can
 int panther_metrics_record(const char* name, double value);
 
 char* panther_bias_detect(const char* samples_json);
+char* panther_bias_detect_neutral_bleu(const char* samples_json, const char* neutral_reference, double weight_dispersion);
 
 int panther_storage_save_metric(const char* name, double value, long long timestamp_ms);
 char* panther_storage_get_history(const char* metric);

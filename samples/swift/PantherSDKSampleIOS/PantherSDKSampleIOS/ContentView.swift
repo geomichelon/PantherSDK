@@ -39,6 +39,8 @@ struct ContentView: View {
     @State private var neutralReference: String = "O uso de medicamentos na gravidez deve ser baseado em avaliação risco‑benefício individualizada por profissional habilitado. Priorizar fármacos com histórico de segurança e categoria de risco favorável, evitando agentes potencialmente teratogênicos. Considerar o princípio ativo e seu mecanismo de ação, bem como alterações farmacocinéticas da gestação para ajuste de posologia. Verificar contraindicações, advertências, interações medicamentosas e possíveis efeitos adversos, com monitoramento clínico adequado. Seguir as normas e orientações da ANVISA e da literatura atualizada. Orientar a paciente a não realizar automedicação e a buscar acompanhamento médico para qualquer dúvida ou sintoma."
     @State private var bleuWeight: Double = 0.3
     @State private var bleuThreshold: Double = 70.0
+    @State private var showHelper: Bool = false
+    @State private var showMetrics: Bool = false
 
     var body: some View {
         NavigationView {
@@ -238,6 +240,22 @@ struct ContentView: View {
                 .padding()
             }
             .navigationTitle("PantherSDK")
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
+                        showMetrics = true
+                    } label: {
+                        Image(systemName: "chart.bar")
+                    }
+                    .accessibilityLabel("Métricas")
+                    Button {
+                        showHelper = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                    }
+                    .accessibilityLabel("Ajuda")
+                }
+            }
         }
         .sheet(isPresented: $showCostRules) {
             NavigationView {
@@ -258,6 +276,8 @@ struct ContentView: View {
                 .navigationTitle("Tabela de Custos")
             }
         }
+        .sheet(isPresented: $showHelper) { HelperView() }
+        .sheet(isPresented: $showMetrics) { MetricsView(rows: results) }
     }
 
     private func runValidation() {
